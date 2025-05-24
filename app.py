@@ -48,6 +48,7 @@ from flask import redirect, url_for, render_template
 from flask_babel import Babel
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_migrate import Migrate
 
 class SecureModelView(ModelView):
     def is_accessible(self):
@@ -322,7 +323,11 @@ login_manager.login_view = 'main.login'  # Redirect to login page if not authent
 
 @app.errorhandler(404)
 def not_found(e):
-    return render_template('404.html'), 404
+    from models import SiteSettings
+    settings = SiteSettings.query.first()
+    return render_template('404.html', site_settings=settings), 404
+
+migrate = Migrate(app, db)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -223,11 +223,9 @@ def set_language(lang_code):
     session['lang'] = lang_code
     return redirect(request.referrer or url_for('main.index'))
 
-# Flask-Babel v4+ uses @babel.locale_selector. If you get an AttributeError, ensure Flask-Babel is up to date.
-# If you still get an error, try using @babel.localeselector (single underscore) instead.
-# For Flask-Babel 4.0.0, the correct decorator is @babel.locale_selector.
-
-@babel.locale_selector
+# Flask-Babel v4.0.0 may not provide the decorator, so set the selector function directly.
 def get_locale():
     from flask import session
     return session.get('lang', 'en')
+
+babel.locale_selector_func = get_locale
