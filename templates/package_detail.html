@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card shadow-lg border-0 mb-4">
+      <img src="{{ url_for('static', filename='packages/' + package.image) if package.image else 'https://via.placeholder.com/600x400?text=Package' }}" class="card-img-top" alt="{{ package.title }}" style="height:320px; object-fit:cover; border-radius:1rem 1rem 0 0;">
+      <div class="card-body">
+        <h2 class="card-title text-warning fw-bold mb-2">{{ package.title }}</h2>
+        <div class="mb-2">
+          <span class="badge bg-warning text-dark fs-6 me-2">₹{{ package.price }}</span>
+          <span class="badge bg-primary fs-6 me-2"><i class="fa fa-clock me-1"></i>{{ package.duration }}</span>
+          <span class="badge bg-success fs-6"><i class="fa fa-star"></i> {{ package.rating if package.rating else '4.8' }}</span>
+        </div>
+        <p class="card-text mb-3">{{ package.description }}</p>
+        <div class="mb-3">
+          <b>Destinations:</b>
+          {% for place in package.places %}
+            <span class="badge bg-info text-dark">{{ place.name }}</span>
+          {% endfor %}
+        </div>
+        <a href="/book?package={{ package.title|urlencode }}" class="btn btn-primary px-4">Book This Package</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

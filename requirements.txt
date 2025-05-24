@@ -1,0 +1,12 @@
+Flask
+Flask-SQLAlchemy
+Flask-Login
+Flask-Admin
+Flask-WTF
+email-validator
+Werkzeug
+Pillow
+Flask-Mail
+python-magic
+Flask-Babel
+Flask-Limiter
