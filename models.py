@@ -30,6 +30,11 @@ class TourPackage(db.Model):
     duration = db.Column(db.String(50), nullable=False)
     image = db.Column(db.String(200))  # Add image field for upload
     places = db.relationship('Place', secondary='package_places', backref='packages')
+    itinerary = db.Column(db.Text)
+    accommodations = db.Column(db.Text)
+    included = db.Column(db.Text)
+    excluded = db.Column(db.Text)
+    custom_destinations = db.Column(db.String(500))  # New field for manual destinations
 
 class PackagePlaces(db.Model):
     __tablename__ = 'package_places'
@@ -47,6 +52,7 @@ class Testimonial(db.Model):
     name = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
     date = db.Column(db.Date)
+    status = db.Column(db.String(20), default='Pending')
 
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -95,3 +101,29 @@ class Blog(db.Model):
     author = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     published = db.Column(db.Boolean, default=False)
+
+class FAQ(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    question = db.Column(db.String(300), nullable=False)
+    answer = db.Column(db.Text, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+
+class SupportTicket(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    subject = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), default='Open')
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    response = db.Column(db.Text)
+    responded_at = db.Column(db.DateTime)
+
+class ItineraryDay(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey('tour_package.id'), nullable=False)
+    day_number = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    
+    package = db.relationship('TourPackage', backref=db.backref('itinerary_days', cascade='all, delete-orphan', order_by='ItineraryDay.day_number'))

@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="section-title text-center">Analytics</h2>
+<div class="row mb-4">
+  <div class="col-md-12">
+    <canvas id="bookingsChart" height="80"></canvas>
+  </div>
+</div>
+<div class="row mb-4">
+  <div class="col-md-6">
+    <canvas id="popularPackagesChart" height="80"></canvas>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const months = {{ months|tojson|safe }};
+const bookingsPerMonth = {{ bookings_per_month|tojson|safe }};
+const popularPackages = {{ popular_packages|tojson|safe }};
+const popularLabels = popularPackages.map(p => p[0]);
+const popularCounts = popularPackages.map(p => p[1]);
+
+new Chart(document.getElementById('bookingsChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [{
+      label: 'Bookings per Month',
+      data: bookingsPerMonth,
+      borderColor: '#007bff',
+      backgroundColor: 'rgba(0,123,255,0.1)',
+      fill: true
+    }]
+  },
+  options: {responsive: true}
+});
+
+new Chart(document.getElementById('popularPackagesChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: popularLabels,
+    datasets: [{
+      label: 'Popular Packages',
+      data: popularCounts,
+      backgroundColor: '#28a745'
+    }]
+  },
+  options: {responsive: true}
+});
+</script>
+{% endblock %}

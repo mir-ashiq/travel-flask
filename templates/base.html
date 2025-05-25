@@ -48,9 +48,6 @@
                     <li class="nav-item"><a class="nav-link" href="/gallery">Gallery</a></li>
                     <li class="nav-item"><a class="nav-link" href="/testimonials">Testimonials</a></li>
                     <li class="nav-item"><a class="nav-link btn btn-warning text-dark ms-2 px-3 fw-bold" href="/book">Book Now</a></li>
-                    {% if current_user.is_authenticated and current_user.is_admin %}
-                    <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
-                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -92,6 +89,9 @@
                     <a href="/" class="d-block text-white">Home</a>
                     <a href="/packages" class="d-block text-white">Packages</a>
                     <a href="/book" class="d-block text-white">Book Now</a>
+                    <a href="/faq" class="d-block text-white">FAQ</a>
+                    <a href="/contact" class="d-block text-white">Contact</a>
+                    <a href="/help" class="d-block text-white">Help Center</a>
                 </div>
             </div>
             <hr class="bg-light">

@@ -1,11 +1,12 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for
-from models import Place, TourPackage, GalleryImage, Testimonial, User, Booking, SiteSettings, EmailLog, Blog
+from models import Place, TourPackage, GalleryImage, Testimonial, User, Booking, SiteSettings, EmailLog, Blog, ItineraryDay
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from extensions import db, mail, limiter, babel
 from flask_mail import Message
 from flask_babel import _
 from flask_limiter.util import get_remote_address
+from datetime import datetime, timedelta
 
 main = Blueprint('main', __name__)
 
@@ -65,7 +66,7 @@ def testimonials():
     if request.method == 'POST':
         name = request.form['name']
         content = request.form['content']
-        t = Testimonial(name=name, content=content)
+        t = Testimonial(name=name, content=content, status='Pending')
         db.session.add(t)
         db.session.commit()
         # Advanced: Notify admin of new testimonial and send confirmation to user
@@ -93,7 +94,7 @@ New testimonial submitted:\n\nName: {name}\nContent: {content}\n"""
         return redirect(url_for('main.testimonials'))
     page = request.args.get('page', 1, type=int)
     per_page = 6
-    pagination = Testimonial.query.order_by(Testimonial.id.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    pagination = Testimonial.query.filter_by(status='Approved').order_by(Testimonial.id.desc()).paginate(page=page, per_page=per_page, error_out=False)
     testimonials = pagination.items
     return render_template('testimonials.html', testimonials=testimonials, pagination=pagination)
 
@@ -191,7 +192,9 @@ def bookings():
 @main.route('/packages/<int:package_id>')
 def package_detail(package_id):
     package = TourPackage.query.get_or_404(package_id)
-    return render_template('package_detail.html', package=package)
+    # Eager load itinerary days, ordered
+    itinerary_days = ItineraryDay.query.filter_by(package_id=package.id).order_by(ItineraryDay.day_number).all()
+    return render_template('package_detail.html', package=package, itinerary_days=itinerary_days)
 
 @main.route('/dashboard')
 @login_required
@@ -210,6 +213,56 @@ def dashboard():
         total_testimonials=total_testimonials,
         recent_bookings=recent_bookings,
         popular_packages=popular_packages)
+
+@main.route('/admin/analytics')
+@login_required
+def analytics():
+    if not current_user.is_admin:
+        return redirect(url_for('main.login'))
+    from models import Booking, TourPackage
+    from extensions import db
+    now = datetime.now()
+    months = [(now.replace(day=1) - timedelta(days=30*i)).strftime('%b %Y') for i in range(11, -1, -1)]
+    bookings_per_month = []
+    for i in range(11, -1, -1):
+        start = (now.replace(day=1) - timedelta(days=30*i))
+        end = (now.replace(day=1) - timedelta(days=30*(i-1))) if i > 0 else now
+        count = Booking.query.filter(Booking.date >= start, Booking.date < end).count()
+        bookings_per_month.append(count)
+    popular_packages = [
+        (row[0], row[1])
+        for row in db.session.query(Booking.package, db.func.count(Booking.package).label('count'))
+            .group_by(Booking.package)
+            .order_by(db.func.count(Booking.package).desc())
+            .limit(5)
+            .all()
+    ]
+    return render_template('analytics.html', months=months, bookings_per_month=bookings_per_month, popular_packages=popular_packages)
+
+@main.route('/faq')
+def faq():
+    from models import FAQ
+    faqs = FAQ.query.filter_by(is_active=True).all()
+    return render_template('faq.html', faqs=faqs)
+
+@main.route('/contact', methods=['GET', 'POST'])
+def contact():
+    from models import SupportTicket
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        subject = request.form['subject']
+        message = request.form['message']
+        ticket = SupportTicket(name=name, email=email, subject=subject, message=message)
+        db.session.add(ticket)
+        db.session.commit()
+        flash('Your message has been received. Our team will contact you soon.')
+        return redirect(url_for('main.contact'))
+    return render_template('contact.html')
+
+@main.route('/help')
+def help_center():
+    return render_template('help.html')
 
 @main.context_processor
 def inject_site_settings():

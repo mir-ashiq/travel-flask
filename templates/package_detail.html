@@ -17,10 +17,68 @@
           {% for place in package.places %}
             <span class="badge bg-info text-dark">{{ place.name }}</span>
           {% endfor %}
+          {% if package.custom_destinations %}
+            {% for dest in package.custom_destinations.split(',') %}
+              <span class="badge bg-warning text-dark">{{ dest.strip() }}</span>
+            {% endfor %}
+          {% endif %}
         </div>
+        {% if itinerary_days|length > 0 %}
+        <div class="mb-4">
+          <h5 class="fw-bold text-primary"><i class="fa fa-route me-1"></i> Itinerary</h5>
+          <ul class="timeline list-unstyled">
+            {% for day in itinerary_days %}
+              <li class="mb-2">
+                <span class="badge bg-secondary me-2">Day {{ day.day_number }}</span>
+                <b>{{ day.title }}</b><br>
+                <span>{{ day.description }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% elif package.itinerary %}
+        <div class="mb-4">
+          <h5 class="fw-bold text-primary"><i class="fa fa-route me-1"></i> Itinerary</h5>
+          <ul class="timeline list-unstyled">
+            {% for day in package.itinerary.split('\n') if day.strip() %}
+              <li class="mb-2"><span class="badge bg-secondary me-2">{{ day.split(':')[0] }}</span> {{ day.split(':', 1)[1] if ':' in day else day }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if package.accommodations %}
+        <div class="mb-3">
+          <h6 class="fw-bold text-success"><i class="fa fa-hotel me-1"></i> Accommodations</h6>
+          <div class="ps-2">{{ package.accommodations|replace('\n', '<br>')|safe }}</div>
+        </div>
+        {% endif %}
+        {% if package.included %}
+        <div class="mb-3">
+          <h6 class="fw-bold text-info"><i class="fa fa-check-circle me-1"></i> Included</h6>
+          <ul class="ps-3">
+            {% for item in package.included.split('\n') if item.strip() %}
+              <li><span class="badge bg-success me-2">Included</span> {{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if package.excluded %}
+        <div class="mb-3">
+          <h6 class="fw-bold text-danger"><i class="fa fa-times-circle me-1"></i> Excluded</h6>
+          <ul class="ps-3">
+            {% for item in package.excluded.split('\n') if item.strip() %}
+              <li><span class="badge bg-danger me-2">Excluded</span> {{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
         <a href="/book?package={{ package.title|urlencode }}" class="btn btn-primary px-4">Book This Package</a>
       </div>
     </div>
   </div>
 </div>
+<style>
+.timeline li { position: relative; padding-left: 1.5em; }
+.timeline li:before { content: '\2022'; color: #0d6efd; position: absolute; left: 0; font-size: 1.2em; top: 0; }
+</style>
 {% endblock %}

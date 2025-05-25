@@ -4,7 +4,8 @@ from flask_login import LoginManager
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 from wtforms.fields import PasswordField
-from flask_admin.form import ImageUploadField, FileUploadField
+from flask_admin.form import ImageUploadField, FileUploadField, Select2Widget
+from wtforms_sqlalchemy.fields import QuerySelectMultipleField
 from flask_wtf import CSRFProtect
 from flask_mail import Mail, Message
 import os
@@ -49,6 +50,7 @@ from flask_babel import Babel
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
+from models import ItineraryDay
 
 class SecureModelView(ModelView):
     def is_accessible(self):
@@ -74,6 +76,8 @@ class CustomAdminIndexView(AdminIndexView):
         settings = SiteSettings.query.first()
         recent_bookings = Booking.query.order_by(Booking.date.desc()).limit(5).all()
         popular_packages = db.session.query(Booking.package, db.func.count(Booking.package).label('count')).group_by(Booking.package).order_by(db.func.count(Booking.package).desc()).limit(5).all()
+        total_faqs = FAQ.query.count()
+        total_tickets = SupportTicket.query.count()
         # Bookings per month (last 12 months)
         now = datetime.now()
         months = [(now.replace(day=1) - timedelta(days=30*i)).strftime('%b %Y') for i in range(11, -1, -1)]
@@ -94,7 +98,9 @@ class CustomAdminIndexView(AdminIndexView):
             recent_bookings=recent_bookings,
             popular_packages=popular_packages,
             months=months,
-            bookings_per_month=bookings_per_month
+            bookings_per_month=bookings_per_month,
+            total_faqs=total_faqs,
+            total_tickets=total_tickets
         )
 
 admin = Admin(app, name='Travel Admin', template_mode='bootstrap4', index_view=CustomAdminIndexView())
@@ -200,15 +206,83 @@ class PlaceAdmin(ModelView):
         }
     }
 
-class TourPackageAdmin(ModelView):
-    form_overrides = {'image': UniqueImageUploadField}
+from wtforms import TextAreaField, StringField
+from wtforms.widgets import TextArea, TextInput
+
+class TourPackageAdmin(SecureModelView):
+    form_extra_fields = {
+        'custom_destinations': StringField(
+            'Custom Destinations (comma separated)',
+            widget=TextInput(),
+            description='You can manually enter destinations here, separated by commas. These will be shown in addition to selected places.'
+        )
+    }
+    inline_models = [
+        (ItineraryDay, dict(form_columns=['id', 'day_number', 'title', 'description']))
+    ]
+    form_overrides = {
+        'image': UniqueImageUploadField,
+        'places': QuerySelectMultipleField,
+        'itinerary': TextAreaField,
+        'accommodations': TextAreaField,
+        'included': TextAreaField,
+        'excluded': TextAreaField,
+    }
     form_args = {
         'image': {
             'label': 'Image',
             'base_path': os.path.join(os.path.dirname(__file__), 'static', 'packages'),
             'allow_overwrite': True,
-        }
+        },
+        'places': {
+            'label': 'Places',
+            'query_factory': lambda: db.session.query(Place).all(),
+            'get_label': 'name',
+            'description': 'Select all places included in this package.'
+        },
+        'itinerary': {
+            'label': 'Itinerary (Day-wise)',
+            'description': 'Enter each day as: Day 1: Visit X, do Y.\nDay 2: ...',
+            'render_kw': {'placeholder': 'Day 1: Arrive in Srinagar, Dal Lake Shikara ride\nDay 2: Gulmarg sightseeing...'}
+        },
+        'accommodations': {
+            'label': 'Accommodations',
+            'description': 'Describe hotels, houseboats, or stays for this package.',
+            'render_kw': {'placeholder': 'Hotel XYZ (Srinagar), Houseboat ABC (Dal Lake)...'}
+        },
+        'included': {
+            'label': 'Included Features',
+            'description': 'List what is included (e.g., meals, transport, guide).',
+            'render_kw': {'placeholder': 'Breakfast, Dinner, Airport Pickup, Local Guide...'}
+        },
+        'excluded': {
+            'label': 'Excluded Features',
+            'description': 'List what is NOT included (e.g., lunch, personal expenses).',
+            'render_kw': {'placeholder': 'Lunch, Personal Expenses, Entry Fees...'}
+        },
     }
+    form_columns = [
+        'title', 'description', 'price', 'duration', 'image', 'places', 'custom_destinations',
+        'itinerary', 'accommodations', 'included', 'excluded'
+    ]
+    column_searchable_list = ['title', 'description', 'itinerary', 'accommodations', 'included', 'excluded']
+    column_filters = ['price', 'duration']
+    form_widget_args = {
+        'itinerary': {'rows': 8, 'style': 'font-family:monospace;'},
+        'accommodations': {'rows': 4},
+        'included': {'rows': 4},
+        'excluded': {'rows': 4},
+    }
+    column_formatters = {
+        'itinerary': lambda v, c, m, p: (m.itinerary[:60] + '...') if m.itinerary and len(m.itinerary) > 60 else (m.itinerary or '')
+    }
+    create_template = 'admin/tourpackage_edit.html'
+    edit_template = 'admin/tourpackage_edit.html'
+    def on_model_change(self, form, model, is_created):
+        # Save custom destinations to a new field or to model.description if you want
+        if hasattr(form, 'custom_destinations') and form.custom_destinations.data:
+            model.custom_destinations = form.custom_destinations.data
+        return super().on_model_change(form, model, is_created)
 
 class SiteSettingsAdmin(ModelView):
     can_create = False  # Only one row
@@ -223,19 +297,25 @@ class SiteSettingsAdmin(ModelView):
     }
 
 # Register models with Flask-Admin
-from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog
+from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay
 
 admin.add_view(SecureModelView(User, db.session, name='Users', endpoint='admin_user'))
 admin.add_view(SecureModelView(Place, db.session, name='Places', endpoint='admin_place'))
-admin.add_view(SecureModelView(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
+admin.add_view(TourPackageAdmin(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
 admin.add_view(SecureModelView(GalleryImage, db.session, name='Gallery Images', endpoint='admin_galleryimage'))
-admin.add_view(SecureModelView(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
+# admin.add_view(SecureModelView(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
+
 admin.add_view(SecureModelView(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
-admin.add_view(SecureModelView(Booking, db.session, name='Bookings', endpoint='admin_booking'))
+# admin.add_view(SecureModelView(Booking, db.session, name='Bookings', endpoint='admin_booking'))
+
 admin.add_view(SecureModelView(EmailSettings, db.session, name='Email Settings', endpoint='admin_emailsettings'))
 admin.add_view(SecureModelView(Blog, db.session, name='Blog', endpoint='admin_blog'))
 admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint='admin_emaillog'))
+admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
+# admin.add_view(SecureModelView(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
+
 admin.add_link(MenuLink(name='Logout', category='', url='/logout'))
+admin.add_link(MenuLink(name='Analytics', category='', url='/admin/analytics'))
 
 # --- Export Bookings as CSV ---
 from flask_login import login_required
@@ -328,6 +408,104 @@ def not_found(e):
     return render_template('404.html', site_settings=settings), 404
 
 migrate = Migrate(app, db)
+
+# Custom Flask-Admin views for Booking, Testimonial, and SupportTicket
+from flask_admin.form import Select2Widget
+from wtforms.fields import SelectField
+from flask_admin.model.helpers import get_mdict_item_or_list
+
+class BookingAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    msg = Message(
+                        subject=f"Your Booking Status Updated: {model.status}",
+                        recipients=[model.email],
+                        body=f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {model.status}.\n\nThank you for booking with us!\n\n- JKL Gurez Travel Team"
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.body, 'sent')
+            except Exception as e:
+                flash(f"Failed to send booking update email: {e}", 'danger')
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Booking Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+        return super().on_model_change(form, model, is_created)
+
+class TestimonialAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('Rejected', 'Rejected')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    msg = Message(
+                        subject=f"Your Testimonial Status Updated: {model.status}",
+                        recipients=[model.email],
+                        body=f"Dear {getattr(model, 'name', 'User')},\n\nYour testimonial status has been updated to: {model.status}.\n\nThank you for your feedback!\n\n- JKL Gurez Travel Team"
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.body, 'sent')
+            except Exception as e:
+                flash(f"Failed to send testimonial update email: {e}", 'danger')
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Testimonial Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour testimonial status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+        return super().on_model_change(form, model, is_created)
+
+class SupportTicketAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Open', 'Open'), ('In Progress', 'In Progress'), ('Closed', 'Closed')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    msg = Message(
+                        subject=f"Your Support Ticket Status Updated: {model.status}",
+                        recipients=[model.email],
+                        body=f"Dear {getattr(model, 'name', 'User')},\n\nYour support ticket status has been updated to: {model.status}.\n\nThank you for contacting us!\n\n- JKL Gurez Travel Team"
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.body, 'sent')
+            except Exception as e:
+                flash(f"Failed to send support ticket update email: {e}", 'danger')
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Support Ticket Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour support ticket status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+        return super().on_model_change(form, model, is_created)
+
+# Register custom admin views for Booking, Testimonial, and SupportTicket (with status dropdowns)
+admin.add_view(BookingAdmin(Booking, db.session, name='Bookings'))
+admin.add_view(TestimonialAdmin(Testimonial, db.session, name='Testimonials'))
+admin.add_view(SupportTicketAdmin(SupportTicket, db.session, name='Support Tickets'))
+
+from flask_admin import helpers as admin_helpers
+
+# Register custom admin template context for help/preview
+@app.context_processor
+def inject_admin_helpers():
+    return dict(admin_helpers=admin_helpers)
 
 if __name__ == '__main__':
     app.run(debug=True)

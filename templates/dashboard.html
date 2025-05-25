@@ -7,7 +7,7 @@
       <div class="card-body">
         <h4 class="text-primary">{{ total_bookings }}</h4>
         <p class="mb-0">Total Bookings</p>
-        <a href="{{ url_for('admin_booking.index_view') }}" class="btn btn-outline-primary btn-sm mt-2">Manage</a>
+        <a href="{{ url_for('booking.index_view') }}" class="btn btn-outline-primary btn-sm mt-2">Manage</a>
       </div>
     </div>
   </div>
@@ -34,7 +34,7 @@
       <div class="card-body">
         <h4 class="text-danger">{{ total_testimonials }}</h4>
         <p class="mb-0">Testimonials</p>
-        <a href="{{ url_for('admin_testimonial.index_view') }}" class="btn btn-outline-danger btn-sm mt-2">Manage</a>
+        <a href="{{ url_for('testimonial.index_view') }}" class="btn btn-outline-danger btn-sm mt-2">Manage</a>
       </div>
     </div>
   </div>
@@ -55,6 +55,24 @@
         <h4 class="text-dark">-</h4>
         <p class="mb-0">Site Settings</p>
         <a href="{{ url_for('admin_sitesettings.index_view') }}" class="btn btn-outline-dark btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-info">{{ total_faqs }}</h4>
+        <p class="mb-0">FAQs</p>
+        <a href="{{ url_for('admin_faq.index_view') }}" class="btn btn-outline-info btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-dark">{{ total_tickets }}</h4>
+        <p class="mb-0">Support Tickets</p>
+        <a href="{{ url_for('supportticket.index_view') }}" class="btn btn-outline-dark btn-sm mt-2">Manage</a>
       </div>
     </div>
   </div>
