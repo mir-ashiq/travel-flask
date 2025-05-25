@@ -106,4 +106,4 @@ venv.bak/
 migrations/versions/__pycache__/
 
 # Don't include database in version control
-*.db
+#*.db

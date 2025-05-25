@@ -330,8 +330,6 @@ admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint
 admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
 # admin.add_view(SecureModelView(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
 
-# Register EmailTemplate admin view with minimal ModelView (no customizations)
-admin.add_view(ModelView(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
 
 admin.add_link(MenuLink(name='Logout', category='', url='/logout'))
 admin.add_link(MenuLink(name='Analytics', category='', url='/admin/analytics'))
@@ -578,6 +576,45 @@ def render_email_template(template_name, context):
     subject = context.get('subject', '')
     html = render_template(f'emails/{template_name}.html', **context)
     return subject, html
+
+from flask_admin.form import rules
+from wtforms import TextAreaField, StringField
+from wtforms.widgets import TextArea, TextInput
+
+class EmailTemplateAdmin(SecureModelView):
+    form_columns = ['name', 'subject', 'html_content']
+    form_overrides = {
+        'subject': StringField,
+        'html_content': TextAreaField
+    }
+    form_widget_args = {
+        'subject': {
+            'placeholder': 'Subject line for the email (e.g. Your Booking is Confirmed)',
+            'style': 'font-weight:bold; font-size:1.1em;'
+        },
+        'html_content': {
+            'rows': 16,
+            'style': 'font-family:monospace; font-size:1em;',
+            'placeholder': '<h1>Dear {{ name }}</h1>\n<p>Your booking is confirmed!</p>'
+        }
+    }
+    form_create_rules = [
+        rules.Field('name'),
+        rules.Field('subject'),
+        rules.Text('You can use Jinja variables like <code>{{ name }}</code>, <code>{{ status }}</code>, etc. in the subject and content.'),
+        rules.Field('html_content')
+    ]
+    form_edit_rules = form_create_rules
+    can_view_details = True
+    can_export = True
+    column_searchable_list = ['name', 'subject']
+    column_filters = ['name']
+    column_editable_list = ['subject']
+    column_list = ['name', 'subject', 'updated_at']
+    column_default_sort = ('updated_at', True)
+
+# Register improved EmailTemplate admin view
+admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
 
 if __name__ == '__main__':
     app.run(debug=True)

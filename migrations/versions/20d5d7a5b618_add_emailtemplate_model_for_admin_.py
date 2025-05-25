@@ -21,6 +21,8 @@ def upgrade():
     op.create_table('email_template',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
+    # sa.Column('subject', sa.String(length=200), nullable=False, server_default=''),
+    #sa.Column('html_content', sa.Text(), nullable=False, server_default=''),
     sa.Column('subject', sa.String(length=200), nullable=False, server_default=''),
     sa.Column('html_content', sa.Text(), nullable=False, server_default=''),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
