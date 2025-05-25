@@ -330,27 +330,8 @@ admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint
 admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
 # admin.add_view(SecureModelView(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
 
-from models import EmailTemplate
-
-class EmailTemplateAdmin(SecureModelView):
-    form_columns = ['name', 'subject', 'html_content', 'updated_at']
-    column_searchable_list = ['name', 'subject']
-    can_create = True
-    can_edit = True
-    can_delete = True
-    can_view_details = True
-    form_overrides = {
-        'html_content': TextAreaField
-    }
-    form_args = {
-        'html_content': {
-            'label': 'HTML Content',
-            'description': 'You can use Jinja variables like {{ name }}, {{ status }}, etc.'
-        }
-    }
-
-# Register EmailTemplate admin view
-admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
+# Register EmailTemplate admin view with minimal ModelView (no customizations)
+admin.add_view(ModelView(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
 
 admin.add_link(MenuLink(name='Logout', category='', url='/logout'))
 admin.add_link(MenuLink(name='Analytics', category='', url='/admin/analytics'))
