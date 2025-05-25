@@ -2,12 +2,21 @@ from extensions import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_babel import lazy_gettext as _l
+from datetime import datetime
+
+class ActivityLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    username = db.Column(db.String(64))
+    action = db.Column(db.String(256))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    role = db.Column(db.String(32), default='admin')  # 'admin', 'staff', 'superadmin', etc.
 
     def set_password(self, password):
         self.password = generate_password_hash(password)

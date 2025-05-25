@@ -27,12 +27,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'  # Use a beautiful Bootstrap swatch
 
 # Configure Flask-Mail
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@jklgtravel.com')
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'mail.lisexports.in')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 465))
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'test@lisexports.in')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'testEmail#123')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'test@lisexports.in')
 
 db.init_app(app)
 mail.init_app(app)
@@ -55,10 +56,25 @@ from models import ItineraryDay
 class SecureModelView(ModelView):
     def is_accessible(self):
         from flask_login import current_user
-        return current_user.is_authenticated and getattr(current_user, 'is_admin', False)
+        return current_user.is_authenticated and getattr(current_user, 'role', 'admin') in ['admin', 'superadmin']
     def inaccessible_callback(self, name, **kwargs):
         from flask import redirect, url_for
         return redirect(url_for('main.login'))
+    def log_activity(self, action):
+        from flask_login import current_user
+        from models import ActivityLog
+        if current_user.is_authenticated:
+            log = ActivityLog(user_id=current_user.id, username=current_user.username, action=action)
+            db.session.add(log)
+            db.session.commit()
+    def on_model_change(self, form, model, is_created):
+        action = f"{'Created' if is_created else 'Edited'} {self.model.__name__} (ID: {getattr(model, 'id', None)})"
+        self.log_activity(action)
+        return super().on_model_change(form, model, is_created)
+    def on_model_delete(self, model):
+        action = f"Deleted {self.model.__name__} (ID: {getattr(model, 'id', None)})"
+        self.log_activity(action)
+        return super().on_model_delete(model)
 
 class CustomAdminIndexView(AdminIndexView):
     @expose('/')
@@ -426,6 +442,7 @@ class BookingAdmin(SecureModelView):
         if not is_created:
             try:
                 if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
                     msg = Message(
                         subject=f"Your Booking Status Updated: {model.status}",
                         recipients=[model.email],
@@ -434,11 +451,11 @@ class BookingAdmin(SecureModelView):
                     mail.send(msg)
                     log_email(model.email, msg.subject, msg.body, 'sent')
             except Exception as e:
-                flash(f"Failed to send booking update email: {e}", 'danger')
                 log_email(model.email if hasattr(model, 'email') else '',
                           f"Your Booking Status Updated: {getattr(model, 'status', '')}",
                           f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {getattr(model, 'status', '')}.",
                           'failed', str(e))
+                flash(f"Failed to send booking update email: {e}", 'danger')
         return super().on_model_change(form, model, is_created)
 
 class TestimonialAdmin(SecureModelView):
@@ -453,6 +470,7 @@ class TestimonialAdmin(SecureModelView):
         if not is_created:
             try:
                 if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
                     msg = Message(
                         subject=f"Your Testimonial Status Updated: {model.status}",
                         recipients=[model.email],
@@ -461,11 +479,11 @@ class TestimonialAdmin(SecureModelView):
                     mail.send(msg)
                     log_email(model.email, msg.subject, msg.body, 'sent')
             except Exception as e:
-                flash(f"Failed to send testimonial update email: {e}", 'danger')
                 log_email(model.email if hasattr(model, 'email') else '',
                           f"Your Testimonial Status Updated: {getattr(model, 'status', '')}",
                           f"Dear {getattr(model, 'name', 'User')},\n\nYour testimonial status has been updated to: {getattr(model, 'status', '')}.",
                           'failed', str(e))
+                flash(f"Failed to send testimonial update email: {e}", 'danger')
         return super().on_model_change(form, model, is_created)
 
 class SupportTicketAdmin(SecureModelView):
@@ -480,6 +498,7 @@ class SupportTicketAdmin(SecureModelView):
         if not is_created:
             try:
                 if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
                     msg = Message(
                         subject=f"Your Support Ticket Status Updated: {model.status}",
                         recipients=[model.email],
@@ -488,11 +507,11 @@ class SupportTicketAdmin(SecureModelView):
                     mail.send(msg)
                     log_email(model.email, msg.subject, msg.body, 'sent')
             except Exception as e:
-                flash(f"Failed to send support ticket update email: {e}", 'danger')
                 log_email(model.email if hasattr(model, 'email') else '',
                           f"Your Support Ticket Status Updated: {getattr(model, 'status', '')}",
                           f"Dear {getattr(model, 'name', 'User')},\n\nYour support ticket status has been updated to: {getattr(model, 'status', '')}.",
                           'failed', str(e))
+                flash(f"Failed to send support ticket update email: {e}", 'danger')
         return super().on_model_change(form, model, is_created)
 
 # Register custom admin views for Booking, Testimonial, and SupportTicket (with status dropdowns)
@@ -506,6 +525,35 @@ from flask_admin import helpers as admin_helpers
 @app.context_processor
 def inject_admin_helpers():
     return dict(admin_helpers=admin_helpers)
+
+def log_email(to, subject, body, status, error=None):
+    try:
+        from models import EmailLog
+        log = EmailLog(
+            recipient=to,
+            subject=subject,
+            body=body,
+            status=status,
+            error=error,
+            sent_at=datetime.utcnow()
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        pass  # Avoid infinite recursion if logging fails
+
+def apply_email_settings():
+    from models import EmailSettings
+    settings = EmailSettings.query.first()
+    if settings:
+        app.config['MAIL_SERVER'] = settings.smtp_server or app.config['MAIL_SERVER']
+        app.config['MAIL_PORT'] = settings.smtp_port or app.config['MAIL_PORT']
+        app.config['MAIL_USE_TLS'] = bool(settings.use_tls) if settings.use_tls is not None else app.config['MAIL_USE_TLS']
+        app.config['MAIL_USE_SSL'] = bool(settings.use_ssl) if settings.use_ssl is not None else app.config['MAIL_USE_SSL']
+        app.config['MAIL_USERNAME'] = settings.username or app.config['MAIL_USERNAME']
+        app.config['MAIL_PASSWORD'] = settings.password or app.config['MAIL_PASSWORD']
+        app.config['MAIL_DEFAULT_SENDER'] = settings.default_sender or app.config['MAIL_DEFAULT_SENDER']
+        mail.init_app(app)
 
 if __name__ == '__main__':
     app.run(debug=True)

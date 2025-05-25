@@ -48,6 +48,11 @@
                     <li class="nav-item"><a class="nav-link" href="/gallery">Gallery</a></li>
                     <li class="nav-item"><a class="nav-link" href="/testimonials">Testimonials</a></li>
                     <li class="nav-item"><a class="nav-link btn btn-warning text-dark ms-2 px-3 fw-bold" href="/book">Book Now</a></li>
+                    {% if current_user.is_authenticated and current_user.is_admin %}
+                    <li class="nav-item">
+                        <a class="nav-link text-danger fw-bold" href="/admin"><i class="fa fa-user-shield me-1"></i>Admin</a>
+                    </li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
