@@ -136,3 +136,10 @@ class ItineraryDay(db.Model):
     description = db.Column(db.Text, nullable=True)
     
     package = db.relationship('TourPackage', backref=db.backref('itinerary_days', cascade='all, delete-orphan', order_by='ItineraryDay.day_number'))
+
+class EmailTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)  # e.g. 'booking_confirmation'
+    subject = db.Column(db.String(200), nullable=False, default='')
+    html_content = db.Column(db.Text, nullable=False, default='')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

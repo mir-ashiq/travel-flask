@@ -138,8 +138,8 @@ class UserAdmin(ModelView):
 # --- File Validation Helpers ---
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 ALLOWED_VIDEO_EXTENSIONS = {'mp4'}
-MAX_IMAGE_SIZE = 2 * 1024 * 1024  # 2MB
-MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB
+MAX_IMAGE_SIZE = 20* 1024 * 1024  # 20MB
+MAX_VIDEO_SIZE = 150 * 1024 * 1024  # 150MB
 
 def allowed_file(filename, allowed_exts):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_exts
@@ -313,7 +313,7 @@ class SiteSettingsAdmin(ModelView):
     }
 
 # Register models with Flask-Admin
-from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay
+from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay, EmailTemplate
 
 admin.add_view(SecureModelView(User, db.session, name='Users', endpoint='admin_user'))
 admin.add_view(SecureModelView(Place, db.session, name='Places', endpoint='admin_place'))
@@ -329,6 +329,28 @@ admin.add_view(SecureModelView(Blog, db.session, name='Blog', endpoint='admin_bl
 admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint='admin_emaillog'))
 admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
 # admin.add_view(SecureModelView(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
+
+from models import EmailTemplate
+
+class EmailTemplateAdmin(SecureModelView):
+    form_columns = ['name', 'subject', 'html_content', 'updated_at']
+    column_searchable_list = ['name', 'subject']
+    can_create = True
+    can_edit = True
+    can_delete = True
+    can_view_details = True
+    form_overrides = {
+        'html_content': TextAreaField
+    }
+    form_args = {
+        'html_content': {
+            'label': 'HTML Content',
+            'description': 'You can use Jinja variables like {{ name }}, {{ status }}, etc.'
+        }
+    }
+
+# Register EmailTemplate admin view
+admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
 
 admin.add_link(MenuLink(name='Logout', category='', url='/logout'))
 admin.add_link(MenuLink(name='Analytics', category='', url='/admin/analytics'))
@@ -413,7 +435,7 @@ app.config['BABEL_DEFAULT_LOCALE'] = 'en'
 @login_manager.user_loader
 def load_user(user_id):
     from models import User
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 login_manager.login_view = 'main.login'  # Redirect to login page if not authenticated
 
@@ -443,13 +465,15 @@ class BookingAdmin(SecureModelView):
             try:
                 if hasattr(model, 'email') and model.email:
                     apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Booking Status Updated: {model.status}"}
+                    subject, html = render_email_template('booking_confirmation', context)
                     msg = Message(
-                        subject=f"Your Booking Status Updated: {model.status}",
+                        subject=subject or f"Your Booking Status Updated: {model.status}",
                         recipients=[model.email],
-                        body=f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {model.status}.\n\nThank you for booking with us!\n\n- JKL Gurez Travel Team"
+                        html=html
                     )
                     mail.send(msg)
-                    log_email(model.email, msg.subject, msg.body, 'sent')
+                    log_email(model.email, msg.subject, msg.html, 'sent')
             except Exception as e:
                 log_email(model.email if hasattr(model, 'email') else '',
                           f"Your Booking Status Updated: {getattr(model, 'status', '')}",
@@ -471,13 +495,15 @@ class TestimonialAdmin(SecureModelView):
             try:
                 if hasattr(model, 'email') and model.email:
                     apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Testimonial Status Updated: {model.status}"}
+                    subject, html = render_email_template('testimonial_confirmation', context)
                     msg = Message(
-                        subject=f"Your Testimonial Status Updated: {model.status}",
+                        subject=subject or f"Your Testimonial Status Updated: {model.status}",
                         recipients=[model.email],
-                        body=f"Dear {getattr(model, 'name', 'User')},\n\nYour testimonial status has been updated to: {model.status}.\n\nThank you for your feedback!\n\n- JKL Gurez Travel Team"
+                        html=html
                     )
                     mail.send(msg)
-                    log_email(model.email, msg.subject, msg.body, 'sent')
+                    log_email(model.email, msg.subject, msg.html, 'sent')
             except Exception as e:
                 log_email(model.email if hasattr(model, 'email') else '',
                           f"Your Testimonial Status Updated: {getattr(model, 'status', '')}",
@@ -499,13 +525,15 @@ class SupportTicketAdmin(SecureModelView):
             try:
                 if hasattr(model, 'email') and model.email:
                     apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Support Ticket Status Updated: {model.status}"}
+                    subject, html = render_email_template('support_ticket', context)
                     msg = Message(
-                        subject=f"Your Support Ticket Status Updated: {model.status}",
+                        subject=subject or f"Your Support Ticket Status Updated: {model.status}",
                         recipients=[model.email],
-                        body=f"Dear {getattr(model, 'name', 'User')},\n\nYour support ticket status has been updated to: {model.status}.\n\nThank you for contacting us!\n\n- JKL Gurez Travel Team"
+                        html=html
                     )
                     mail.send(msg)
-                    log_email(model.email, msg.subject, msg.body, 'sent')
+                    log_email(model.email, msg.subject, msg.html, 'sent')
             except Exception as e:
                 log_email(model.email if hasattr(model, 'email') else '',
                           f"Your Support Ticket Status Updated: {getattr(model, 'status', '')}",
@@ -554,6 +582,21 @@ def apply_email_settings():
         app.config['MAIL_PASSWORD'] = settings.password or app.config['MAIL_PASSWORD']
         app.config['MAIL_DEFAULT_SENDER'] = settings.default_sender or app.config['MAIL_DEFAULT_SENDER']
         mail.init_app(app)
+
+from flask import render_template_string
+
+def render_email_template(template_name, context):
+    from models import EmailTemplate
+    template = EmailTemplate.query.filter_by(name=template_name).first()
+    if template:
+        # Use admin-edited template from DB
+        subject = render_template_string(template.subject, **context)
+        html = render_template_string(template.html_content, **context)
+        return subject, html
+    # Fallback to file-based template
+    subject = context.get('subject', '')
+    html = render_template(f'emails/{template_name}.html', **context)
+    return subject, html
 
 if __name__ == '__main__':
     app.run(debug=True)
