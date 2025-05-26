@@ -59,6 +59,9 @@ from models import (
 )
 from wtforms import TextAreaField
 from flask_admin.actions import action
+from flask_admin.babel import gettext
+from flask_admin.model.template import macro
+from flask import Markup, jsonify, abort
 
 class SecureModelView(ModelView):
     def is_accessible(self):
@@ -110,6 +113,13 @@ class CustomAdminIndexView(AdminIndexView):
             end = (now.replace(day=1) - timedelta(days=30*(i-1))) if i > 0 else now
             count = Booking.query.filter(Booking.date >= start, Booking.date < end).count()
             bookings_per_month.append(count)
+        # --- Advanced widgets ---
+        # Bookings by region
+        bookings_by_region = db.session.query(Place.region, db.func.count(Booking.id)).join(TourPackage.places).join(Booking, Booking.package == TourPackage.id).group_by(Place.region).all()
+        # Ticket status pie
+        ticket_statuses = db.session.query(SupportTicket.status, db.func.count(SupportTicket.id)).group_by(SupportTicket.status).all()
+        # Revenue (sum of all bookings' package price)
+        revenue = db.session.query(db.func.sum(TourPackage.price)).join(Booking, Booking.package == TourPackage.id).scalar() or 0
         return self.render('dashboard.html',
             total_bookings=total_bookings,
             total_packages=total_packages,
@@ -123,7 +133,10 @@ class CustomAdminIndexView(AdminIndexView):
             months=months,
             bookings_per_month=bookings_per_month,
             total_faqs=total_faqs,
-            total_tickets=total_tickets
+            total_tickets=total_tickets,
+            bookings_by_region=bookings_by_region,
+            ticket_statuses=ticket_statuses,
+            revenue=revenue
         )
 
 admin = Admin(app, name='Travel Admin', template_mode='bootstrap4', index_view=CustomAdminIndexView())
@@ -304,6 +317,8 @@ class EmailTemplateAdmin(SecureModelView):
     create_template = 'admin/model/create.html'
     edit_template = 'admin/model/edit.html'
 
+# --- Admin Quick Actions and Advanced Features ---
+
 class TestimonialAdmin(SecureModelView):
     form_overrides = dict(status=SelectField)
     form_args = dict(
@@ -321,6 +336,7 @@ class TestimonialAdmin(SecureModelView):
     can_create = True
     can_delete = True
     can_edit_inline = True
+    list_template = 'admin/model/list_with_actions.html'
 
     @action('approve', 'Approve', 'Are you sure you want to approve selected testimonials?')
     def action_approve(self, ids):
@@ -352,6 +368,12 @@ class TestimonialAdmin(SecureModelView):
                 raise
             flash(f'Failed to reject testimonials. {str(ex)}', 'danger')
 
+    def get_actions(self):
+        actions = super().get_actions()
+        actions['approve'] = (self.action_approve, 'approve', 'Approve')
+        actions['reject'] = (self.action_reject, 'reject', 'Reject')
+        return actions
+
 class BookingAdmin(SecureModelView):
     form_overrides = dict(status=SelectField)
     form_args = dict(
@@ -362,13 +384,28 @@ class BookingAdmin(SecureModelView):
     )
     form_columns = ['name', 'email', 'phone', 'package', 'message', 'date', 'status']
     column_searchable_list = ['name', 'email', 'phone', 'package', 'status']
-    column_filters = ['status', 'date']
+    column_filters = ['status', 'date', 'package']  # Removed 'price' as Booking has no 'price' field
     can_view_details = True
     can_export = True
     can_edit = True
     can_create = True
     can_delete = True
     can_edit_inline = True
+    list_template = 'admin/model/list_with_actions.html'
+    column_extra_row_actions = [
+        {
+            'label': 'Confirm',
+            'icon': 'fa fa-check',
+            'action': 'confirm',
+            'visible': lambda model: model.status != 'Confirmed'
+        },
+        {
+            'label': 'Cancel',
+            'icon': 'fa fa-times',
+            'action': 'cancel',
+            'visible': lambda model: model.status != 'Cancelled'
+        }
+    ]
 
     @action('confirm', 'Confirm', 'Are you sure you want to confirm selected bookings?')
     def action_confirm(self, ids):
@@ -400,6 +437,12 @@ class BookingAdmin(SecureModelView):
                 raise
             flash(f'Failed to cancel bookings. {str(ex)}', 'danger')
 
+    def get_actions(self):
+        actions = super().get_actions()
+        actions['confirm'] = (self.action_confirm, 'confirm', 'Confirm')
+        actions['cancel'] = (self.action_cancel, 'cancel', 'Cancel')
+        return actions
+
 class GalleryImageAdmin(ModelView):
     form_extra_fields = {
         'image': UniqueImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'gallery'), allow_overwrite=True),
@@ -422,26 +465,140 @@ class GalleryImageAdmin(ModelView):
     column_display_all_relations = True
     column_formatters_export = {}
 
-class TourPackageAdmin(ModelView):
-    # Add thumbnail for image field in list view
-    form_extra_fields = {
-        'image': UniqueImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'packages'), allow_overwrite=True)
-    }
-    form_columns = ['title', 'description', 'price', 'duration', 'image', 'places', 'custom_destinations']  # removed 'is_active'
+class ItineraryDayAdmin(ModelView):
+    form_overrides = {'description': CKEditorField}
+    form_columns = ['day_number', 'title', 'description']
     column_searchable_list = ['title', 'description']
-    column_filters = ['duration']  # removed 'is_active'
     can_view_details = True
     can_export = True
     can_edit = True
     can_create = True
     can_delete = True
+
+class TourPackageAdmin(ModelView):
+    # Add thumbnail for image field in list view
+    form_extra_fields = {
+        'image': UniqueImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'packages'), allow_overwrite=True)
+    }
+    form_overrides = {
+        'description': CKEditorField,
+        'itinerary': CKEditorField,
+        'accommodations': CKEditorField,
+        'included': CKEditorField,
+        'excluded': CKEditorField
+    }
+    form_args = {
+        'title': {'description': 'Enter a descriptive and unique package title.'},
+        'description': {'description': 'Full package description. Use formatting and images as needed.'},
+        'price': {'description': 'Total price for the package (in INR).'},
+        'duration': {'description': 'Number of days for the tour.'},
+        'places': {'description': 'Select all included places.'},
+        'custom_destinations': {'description': 'Comma-separated list of custom destinations (optional).'},
+        'itinerary': {'description': 'Full itinerary in rich text.'},
+        'accommodations': {'description': 'Accommodation details.'},
+        'included': {'description': 'What is included in the package.'},
+        'excluded': {'description': 'What is NOT included in the package.'},
+        'itinerary_days': {'description': 'Add detailed day-wise itinerary.'},
+        'published': {'description': 'Is this package visible to users?'}
+    }
+    form_columns = [
+        'title', 'description', 'price', 'duration', 'image', 'places', 'custom_destinations',
+        'itinerary', 'accommodations', 'included', 'excluded', 'itinerary_days', 'published'
+    ]
+    inline_models = [(ItineraryDay, dict(form_overrides={'description': CKEditorField}))]
+    column_searchable_list = ['title', 'description', 'price', 'duration', 'custom_destinations']
+    column_filters = ['duration', 'price', 'places', 'custom_destinations', 'published']
+    can_view_details = True
+    can_export = True
+    can_edit = True
+    can_create = True
+    can_delete = True
+    can_edit_inline = True
+    list_template = 'admin/model/list_with_actions.html'  # For quick actions/details modal
     column_formatters = {
-        'image': lambda v, c, m, p: f'<img src="/static/packages/{m.image}" width="80">' if m.image else ''
+        'image': lambda v, c, m, p: f'<img src="/static/packages/{m.image}" width="80">' if m.image else '',
+        'description': lambda v, c, m, p: (m.description[:50] + '...') if m.description and len(m.description) > 50 else m.description,
+        'published': lambda v, c, m, p: '<span class="badge badge-success">Published</span>' if getattr(m, 'published', False) else '<span class="badge badge-secondary">Draft</span>',
+        'places': lambda v, c, m, p: ', '.join([place.name for place in m.places]) if m.places else ''
     }
     column_formatters_detail = column_formatters
     column_display_pk = True
     column_display_all_relations = True
     column_formatters_export = {}
+    edit_template = 'admin/tourpackage_edit.html'
+
+    @action('publish', 'Publish', 'Are you sure you want to publish selected packages?')
+    def action_publish(self, ids):
+        try:
+            query = self.session.query(self.model).filter(self.model.id.in_(ids))
+            count = 0
+            for pkg in query:
+                pkg.published = True
+                count += 1
+            self.session.commit()
+            flash(f'{count} packages published.', 'success')
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash(f'Failed to publish packages. {str(ex)}', 'danger')
+
+    @action('unpublish', 'Unpublish', 'Are you sure you want to unpublish selected packages?')
+    def action_unpublish(self, ids):
+        try:
+            query = self.session.query(self.model).filter(self.model.id.in_(ids))
+            count = 0
+            for pkg in query:
+                pkg.published = False
+                count += 1
+            self.session.commit()
+            flash(f'{count} packages unpublished.', 'success')
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash(f'Failed to unpublish packages. {str(ex)}', 'danger')
+
+    @action('duplicate', 'Duplicate', 'Duplicate selected packages?')
+    def action_duplicate(self, ids):
+        try:
+            from copy import deepcopy
+            query = self.session.query(self.model).filter(self.model.id.in_(ids))
+            count = 0
+            for pkg in query:
+                new_pkg = self.model(
+                    title=pkg.title + ' (Copy)',
+                    description=pkg.description,
+                    price=pkg.price,
+                    duration=pkg.duration,
+                    image=pkg.image,
+                    itinerary=pkg.itinerary,
+                    accommodations=pkg.accommodations,
+                    included=pkg.included,
+                    excluded=pkg.excluded,
+                    custom_destinations=pkg.custom_destinations,
+                    published=False
+                )
+                new_pkg.places = list(pkg.places)
+                self.session.add(new_pkg)
+                count += 1
+            self.session.commit()
+            flash(f'{count} packages duplicated.', 'success')
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash(f'Failed to duplicate packages. {str(ex)}', 'danger')
+
+    def get_actions(self):
+        actions = super().get_actions()
+        actions['publish'] = (self.action_publish, 'publish', 'Publish')
+        actions['unpublish'] = (self.action_unpublish, 'unpublish', 'Unpublish')
+        actions['duplicate'] = (self.action_duplicate, 'duplicate', 'Duplicate')
+        return actions
+
+    # Add a toggle for published status in list_with_actions.html (template)
+    # Show published badge in list view (already in column_formatters)
+    # Add a quick duplicate button in the actions column (template)
+    # Add tooltips for all fields using WTForms descriptions
+    # Add advanced filter widgets in template if needed
 
 class SupportTicketAdmin(SecureModelView):
     can_view_details = True
@@ -630,3 +787,143 @@ def render_email_template(template_name, context):
         except Exception:
             html = f"<p>{subject}</p>"
         return subject, html
+
+# --- Dark Mode Toggle (JS/CSS) ---
+# Add to base admin template (see below for template instructions)
+
+# --- Real-time Notifications (basic polling) ---
+@app.route('/admin/notifications')
+@login_required
+def admin_notifications():
+    from models import Booking, SupportTicket
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        abort(403)
+    new_bookings = Booking.query.filter_by(status='Pending').count()
+    new_tickets = SupportTicket.query.filter_by(status='Open').count()
+    return jsonify({'new_bookings': new_bookings, 'new_tickets': new_tickets})
+
+# --- User Impersonation (admin login as user) ---
+@app.route('/admin/impersonate/<int:user_id>')
+@login_required
+def impersonate_user(user_id):
+    from models import User
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        abort(403)
+    user = User.query.get(user_id)
+    if not user:
+        abort(404)
+    from flask_login import login_user
+    login_user(user)
+    flash(f'Now impersonating {user.username}', 'info')
+    return redirect(url_for('main.index'))
+
+# --- PDF Export for Bookings/Packages (basic) ---
+@app.route('/admin/export_bookings_pdf')
+@login_required
+def export_bookings_pdf():
+    from models import Booking
+    from flask import render_template
+    from xhtml2pdf import pisa
+    bookings = Booking.query.order_by(Booking.date.desc()).all()
+    html = render_template('admin/bookings_pdf.html', bookings=bookings)
+    pdf = io.BytesIO()
+    pisa.CreatePDF(io.StringIO(html), dest=pdf)
+    pdf.seek(0)
+    return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name='bookings.pdf')
+
+@app.route('/admin/export_packages_pdf')
+@login_required
+def export_packages_pdf():
+    from models import TourPackage
+    from flask import render_template
+    from xhtml2pdf import pisa
+    packages = TourPackage.query.order_by(TourPackage.id.desc()).all()
+    html = render_template('admin/packages_pdf.html', packages=packages)
+    pdf = io.BytesIO()
+    pisa.CreatePDF(io.StringIO(html), dest=pdf)
+    pdf.seek(0)
+    return send_file(pdf, mimetype='application/pdf', as_attachment=True, download_name='packages.pdf')
+
+# --- Bulk Import for Users/Packages (CSV) ---
+@app.route('/admin/import_users', methods=['GET', 'POST'])
+@login_required
+def import_users():
+    from models import User
+    import csv
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file:
+            flash('No file uploaded.', 'danger')
+            return redirect(request.url)
+        reader = csv.DictReader(io.StringIO(file.read().decode()))
+        count = 0
+        for row in reader:
+            if 'username' in row and row['username']:
+                user = User(username=row['username'], is_admin=row.get('is_admin', False))
+                user.set_password(row.get('password', 'changeme'))
+                db.session.add(user)
+                count += 1
+        db.session.commit()
+        flash(f'Imported {count} users.', 'success')
+        return redirect(url_for('admin_user.index_view'))
+    return render_template('admin/import_users.html')
+
+@app.route('/admin/import_packages', methods=['GET', 'POST'])
+@login_required
+def import_packages():
+    from models import TourPackage
+    import csv
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if not file:
+            flash('No file uploaded.', 'danger')
+            return redirect(request.url)
+        reader = csv.DictReader(io.StringIO(file.read().decode()))
+        count = 0
+        for row in reader:
+            if 'title' in row and row['title']:
+                pkg = TourPackage(title=row['title'], description=row.get('description', ''), price=row.get('price', 0), duration=row.get('duration', 0))
+                db.session.add(pkg)
+                count += 1
+        db.session.commit()
+        flash(f'Imported {count} packages.', 'success')
+        return redirect(url_for('admin_tourpackage.index_view'))
+    return render_template('admin/import_packages.html')
+
+# --- Add links for new features ---
+admin.add_link(MenuLink(name='Export Bookings (PDF)', category='', url='/admin/export_bookings_pdf'))
+admin.add_link(MenuLink(name='Export Packages (PDF)', category='', url='/admin/export_packages_pdf'))
+admin.add_link(MenuLink(name='Bulk Import Users', category='', url='/admin/import_users'))
+admin.add_link(MenuLink(name='Bulk Import Packages', category='', url='/admin/import_packages'))
+
+# --- Dashboard Analytics Widgets (add to dashboard.html template) ---
+# - Bookings by region (bar chart)
+# - Revenue (line chart)
+# - Ticket status (pie chart)
+# (See dashboard.html for implementation; data is already provided in CustomAdminIndexView)
+
+# --- Quick Actions, Inline Editing, Tooltips ---
+# For Bookings, Testimonials, Support Tickets: add a 'Quick Actions' column in the list view template (list_with_actions.html) with approve/reject/confirm/cancel buttons.
+# For inline editing, set can_edit_inline = True and use Flask-Admin's inline editing for key fields.
+# For tooltips/help, add WTForms field descriptions and update templates to show them as tooltips.
+
+# --- Dark Mode Toggle ---
+# Add a dark mode toggle button in the base admin template (base.html or admin/base.html). Use JS/CSS to switch themes.
+
+# --- Details Modal ---
+# In list_with_actions.html, add a 'Details' button to open a modal with record details (AJAX fetch or render hidden content).
+
+# --- Help Comments ---
+# For any complex field, add a description in the WTForms field definition (e.g., description='This field controls...').
+
+# --- Template Changes Required ---
+# - admin/list_with_actions.html: for quick actions, details modal, inline editing
+# - admin/import_users.html, admin/import_packages.html: for bulk import forms
+# - admin/bookings_pdf.html, admin/packages_pdf.html: for PDF export
+# - base.html or admin/base.html: for dark mode toggle, notifications
+#
+# See README or comments for further UI/UX polish and advanced analytics.

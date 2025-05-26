@@ -44,6 +44,7 @@ class TourPackage(db.Model):
     included = db.Column(db.Text)
     excluded = db.Column(db.Text)
     custom_destinations = db.Column(db.String(500))  # New field for manual destinations
+    published = db.Column(db.Boolean, default=False)  # New field for published status
 
 class PackagePlaces(db.Model):
     __tablename__ = 'package_places'

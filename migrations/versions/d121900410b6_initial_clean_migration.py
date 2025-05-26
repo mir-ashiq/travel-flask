@@ -1,8 +1,8 @@
-"""Initial clean migration for all models
+"""Initial clean migration
 
-Revision ID: c50299d6f5b9
+Revision ID: d121900410b6
 Revises: 
-Create Date: 2025-05-26 00:01:26.214691
+Create Date: 2025-05-26 21:11:47.955378
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'c50299d6f5b9'
+revision = 'd121900410b6'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -25,6 +25,15 @@ def upgrade():
     sa.Column('is_active', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('blog',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(length=200), nullable=False),
+    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('author', sa.String(length=100), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.Column('published', sa.Boolean(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('booking',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
@@ -34,6 +43,27 @@ def upgrade():
     sa.Column('message', sa.Text(), nullable=True),
     sa.Column('date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('email_log',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('to', sa.String(length=200), nullable=True),
+    sa.Column('subject', sa.String(length=200), nullable=True),
+    sa.Column('body', sa.Text(), nullable=True),
+    sa.Column('status', sa.String(length=20), nullable=True),
+    sa.Column('error', sa.Text(), nullable=True),
+    sa.Column('sent_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('email_settings',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('smtp_server', sa.String(length=120), nullable=True),
+    sa.Column('smtp_port', sa.Integer(), nullable=True),
+    sa.Column('use_tls', sa.Boolean(), nullable=True),
+    sa.Column('use_ssl', sa.Boolean(), nullable=True),
+    sa.Column('username', sa.String(length=120), nullable=True),
+    sa.Column('password', sa.String(length=120), nullable=True),
+    sa.Column('default_sender', sa.String(length=120), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('email_template',
@@ -112,6 +142,7 @@ def upgrade():
     sa.Column('included', sa.Text(), nullable=True),
     sa.Column('excluded', sa.Text(), nullable=True),
     sa.Column('custom_destinations', sa.String(length=500), nullable=True),
+    sa.Column('published', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user',
@@ -164,6 +195,9 @@ def downgrade():
     op.drop_table('place')
     op.drop_table('gallery_image')
     op.drop_table('email_template')
+    op.drop_table('email_settings')
+    op.drop_table('email_log')
     op.drop_table('booking')
+    op.drop_table('blog')
     op.drop_table('FAQ')
     # ### end Alembic commands ###
