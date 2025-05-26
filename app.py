@@ -244,7 +244,7 @@ class PlaceAdmin(ModelView):
     form_extra_fields = {
         'image': ImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'places'), allow_overwrite=True)
     }
-    form_overrides = {'region': SelectField}  # Added to ensure region uses SelectField
+    form_overrides = {'region': SelectField}
     form_args = {
         'region': {
             'label': 'Region',
@@ -260,6 +260,15 @@ class PlaceAdmin(ModelView):
     can_edit = True
     can_create = True
     can_delete = True
+    can_edit_inline = True  # Allow inline editing
+    column_formatters = {
+        'image': lambda v, c, m, p: f'<img src="/static/places/{m.image}" width="80">' if m.image else '',
+        'description': lambda v, c, m, p: (m.description[:50] + '...') if m.description and len(m.description) > 50 else m.description
+    }
+    column_formatters_detail = column_formatters
+    column_display_pk = True
+    column_display_all_relations = True
+    column_formatters_export = {}
 
 class FAQAdmin(SecureModelView):
     form_overrides = {'answer': CKEditorField}
