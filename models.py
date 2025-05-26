@@ -76,13 +76,21 @@ class Booking(db.Model):
 class SiteSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     site_name = db.Column(db.String(120), default='JKLG Travel')
+    site_title = db.Column(db.String(200), default='JKLG Travel - Explore Jammu, Kashmir, Ladakh & Gurez')
     logo = db.Column(db.String(200))
     phone = db.Column(db.String(30), default='+91-12345-67890')
     email = db.Column(db.String(120), default='info@jklgtravel.com')
     address = db.Column(db.String(200), default='Jammu, Kashmir, Ladakh & Gurez')
-    facebook = db.Column(db.String(200))
-    instagram = db.Column(db.String(200))
-    twitter = db.Column(db.String(200))
+    facebook = db.Column(db.String(120))  # Username only
+    instagram = db.Column(db.String(120))  # Username only
+    twitter = db.Column(db.String(120))  # Username only
+    linkedin = db.Column(db.String(120))  # Username only
+    youtube = db.Column(db.String(120))  # Channel/user ID only
+    whatsapp = db.Column(db.String(30))  # Number only
+    telegram = db.Column(db.String(120))  # Username only
+    meta_description = db.Column(db.String(300))
+    about = db.Column(db.Text)
+    google_analytics_id = db.Column(db.String(32))
 
 class EmailSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)

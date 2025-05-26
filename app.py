@@ -51,7 +51,7 @@ from flask_babel import Babel
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
-from models import ItineraryDay
+from models import ItineraryDay, User
 
 class SecureModelView(ModelView):
     def is_accessible(self):
@@ -128,12 +128,52 @@ app.register_blueprint(main)
 # from app.admin import admin_bp
 # app.register_blueprint(admin_bp)
 
-class UserAdmin(ModelView):
-    form_excluded_columns = ['password']
+class UserAdmin(SecureModelView):
+    form_columns = ['username', 'password', 'is_admin', 'role']
+    form_overrides = {'password': PasswordField}
+    column_searchable_list = ['username']
+    column_filters = ['is_admin', 'role']
     column_exclude_list = ['password']
-    can_create = False
-    can_edit = False
     can_view_details = True
+    can_export = True
+    can_create = True
+    can_edit = True
+    can_delete = True
+
+    def on_model_change(self, form, model, is_created):
+        # Hash password if set/changed
+        if form.password.data:
+            model.set_password(form.password.data)
+        else:
+            # Don't overwrite password if not set
+            if not is_created:
+                del form.password
+        return super().on_model_change(form, model, is_created)
+
+    @expose('/reset_password/', methods=['GET', 'POST'])
+    def reset_password_view(self):
+        from flask import request, redirect, url_for, flash, render_template
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            confirm = request.form.get('confirm')
+            user = self.session.query(self.model).filter_by(username=username).first()
+            if not user:
+                flash('No user found with that username.', 'danger')
+            elif password != confirm:
+                flash('Passwords do not match.', 'danger')
+            else:
+                user.set_password(password)
+                self.session.commit()
+                flash(f'Password reset for {user.username}.', 'success')
+                return redirect(url_for('.index_view'))
+        return render_template('admin/reset_password.html')
+
+    @expose('/')
+    def index_view(self):
+        from flask import render_template, request
+        # Add a visible link/button to reset password in the user admin panel
+        return super().index_view()
 
 # --- File Validation Helpers ---
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -194,13 +234,12 @@ class UniqueVideoUploadField(FileUploadField):
         super().pre_validate(form)
 
 class GalleryImageAdmin(ModelView):
-    form_overrides = {'image': UniqueImageUploadField, 'video': UniqueVideoUploadField}
+    form_extra_fields = {
+        'image': ImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'gallery'), allow_overwrite=True),
+        'video': UniqueVideoUploadField('Video', base_path=os.path.join(os.path.dirname(__file__), 'static', 'gallery'), allowed_extensions=['mp4'], allow_overwrite=True)
+    }
+    form_overrides = {}
     form_args = {
-        'image': {
-            'label': 'Image',
-            'base_path': os.path.join(os.path.dirname(__file__), 'static', 'gallery'),
-            'allow_overwrite': True,
-        },
         'video': {
             'label': 'Video (MP4, optional)',
             'base_path': os.path.join(os.path.dirname(__file__), 'static', 'gallery'),
@@ -212,127 +251,70 @@ class GalleryImageAdmin(ModelView):
         'video': UniqueVideoUploadField('Video', base_path=os.path.join(os.path.dirname(__file__), 'static', 'gallery'), allowed_extensions=['mp4'], allow_overwrite=True)
     }
 
-class PlaceAdmin(ModelView):
-    form_overrides = {'image': UniqueImageUploadField}
-    form_args = {
-        'image': {
-            'label': 'Image',
-            'base_path': os.path.join(os.path.dirname(__file__), 'static', 'places'),
-            'allow_overwrite': True,
-        }
-    }
-
-from wtforms import TextAreaField, StringField
-from wtforms.widgets import TextArea, TextInput
-
-class TourPackageAdmin(SecureModelView):
+# --- Add TourPackageAdmin for package management ---
+class TourPackageAdmin(ModelView):
     form_extra_fields = {
-        'custom_destinations': StringField(
-            'Custom Destinations (comma separated)',
-            widget=TextInput(),
-            description='You can manually enter destinations here, separated by commas. These will be shown in addition to selected places.'
-        )
+        'image': ImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'packages'), allow_overwrite=True)
     }
-    inline_models = [
-        (ItineraryDay, dict(form_columns=['id', 'day_number', 'title', 'description']))
-    ]
-    form_overrides = {
-        'image': UniqueImageUploadField,
-        'places': QuerySelectMultipleField,
-        'itinerary': TextAreaField,
-        'accommodations': TextAreaField,
-        'included': TextAreaField,
-        'excluded': TextAreaField,
+    form_overrides = {}
+    form_args = {}
+
+class PlaceAdmin(ModelView):
+    form_extra_fields = {
+        'image': ImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'places'), allow_overwrite=True)
     }
-    form_args = {
-        'image': {
-            'label': 'Image',
-            'base_path': os.path.join(os.path.dirname(__file__), 'static', 'packages'),
-            'allow_overwrite': True,
-        },
-        'places': {
-            'label': 'Places',
-            'query_factory': lambda: db.session.query(Place).all(),
-            'get_label': 'name',
-            'description': 'Select all places included in this package.'
-        },
-        'itinerary': {
-            'label': 'Itinerary (Day-wise)',
-            'description': 'Enter each day as: Day 1: Visit X, do Y.\nDay 2: ...',
-            'render_kw': {'placeholder': 'Day 1: Arrive in Srinagar, Dal Lake Shikara ride\nDay 2: Gulmarg sightseeing...'}
-        },
-        'accommodations': {
-            'label': 'Accommodations',
-            'description': 'Describe hotels, houseboats, or stays for this package.',
-            'render_kw': {'placeholder': 'Hotel XYZ (Srinagar), Houseboat ABC (Dal Lake)...'}
-        },
-        'included': {
-            'label': 'Included Features',
-            'description': 'List what is included (e.g., meals, transport, guide).',
-            'render_kw': {'placeholder': 'Breakfast, Dinner, Airport Pickup, Local Guide...'}
-        },
-        'excluded': {
-            'label': 'Excluded Features',
-            'description': 'List what is NOT included (e.g., lunch, personal expenses).',
-            'render_kw': {'placeholder': 'Lunch, Personal Expenses, Entry Fees...'}
-        },
-    }
-    form_columns = [
-        'title', 'description', 'price', 'duration', 'image', 'places', 'custom_destinations',
-        'itinerary', 'accommodations', 'included', 'excluded'
-    ]
-    column_searchable_list = ['title', 'description', 'itinerary', 'accommodations', 'included', 'excluded']
-    column_filters = ['price', 'duration']
-    form_widget_args = {
-        'itinerary': {'rows': 8, 'style': 'font-family:monospace;'},
-        'accommodations': {'rows': 4},
-        'included': {'rows': 4},
-        'excluded': {'rows': 4},
-    }
-    column_formatters = {
-        'itinerary': lambda v, c, m, p: (m.itinerary[:60] + '...') if m.itinerary and len(m.itinerary) > 60 else (m.itinerary or '')
-    }
-    create_template = 'admin/tourpackage_edit.html'
-    edit_template = 'admin/tourpackage_edit.html'
-    def on_model_change(self, form, model, is_created):
-        # Save custom destinations to a new field or to model.description if you want
-        if hasattr(form, 'custom_destinations') and form.custom_destinations.data:
-            model.custom_destinations = form.custom_destinations.data
-        return super().on_model_change(form, model, is_created)
+    form_overrides = {}
+    form_args = {}
 
 class SiteSettingsAdmin(ModelView):
     can_create = False  # Only one row
     can_delete = False
-    form_overrides = {'logo': UniqueImageUploadField}
+    form_extra_fields = {
+        'logo': ImageUploadField('Logo', base_path=os.path.join(os.path.dirname(__file__), 'static', 'uploads'), allow_overwrite=True)
+    }
     form_args = {
-        'logo': {
-            'label': 'Logo',
-            'base_path': os.path.join(os.path.dirname(__file__), 'static'),
-            'allow_overwrite': True,
-        }
+        'facebook': {'label': 'Facebook Username', 'description': 'Enter only the username (e.g. jklgtravel)'},
+        'instagram': {'label': 'Instagram Username', 'description': 'Enter only the username (e.g. jklgtravel)'},
+        'twitter': {'label': 'Twitter Username', 'description': 'Enter only the username (e.g. jklgtravel)'},
+        'linkedin': {'label': 'LinkedIn Username', 'description': 'Enter only the username (e.g. company/jklgtravel or in/jklgtravel)'},
+        'youtube': {'label': 'YouTube Channel/User', 'description': 'Enter only the channel or user ID (e.g. UCxxxx...)'},
+        'whatsapp': {'label': 'WhatsApp Number', 'description': 'Enter only the number (e.g. 911234567890)'},
+        'telegram': {'label': 'Telegram Username', 'description': 'Enter only the username (e.g. jklgtravel)'},
+        'meta_description': {'label': 'Meta Description', 'description': 'For SEO (max 300 chars)'},
+        'about': {'label': 'About/Description', 'description': 'Short about text for the site'},
+        'google_analytics_id': {'label': 'Google Analytics ID', 'description': 'e.g. UA-XXXXXXXXX-X or G-XXXXXXXXXX'},
+        'site_title': {'label': 'Site Title', 'description': 'Displayed in browser tab and meta'},
+    }
+    form_columns = [
+        'site_name', 'site_title', 'logo', 'phone', 'email', 'address',
+        'facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'whatsapp', 'telegram',
+        'meta_description', 'about', 'google_analytics_id'
+    ]
+    column_formatters = {
+        'logo': lambda v, c, m, p: f'<img src="/static/uploads/{m.logo}" height="60" style="max-width:200px;">' if m.logo else ''
+    }
+    column_formatters_detail = column_formatters
+    form_widget_args = {
+        'logo': {'style': 'max-width: 300px;'},
     }
 
 # Register models with Flask-Admin
 from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay, EmailTemplate
 
-admin.add_view(SecureModelView(User, db.session, name='Users', endpoint='admin_user'))
-admin.add_view(SecureModelView(Place, db.session, name='Places', endpoint='admin_place'))
+# Register custom UserAdmin view and other admin views AFTER all admin classes are defined
+admin.add_view(UserAdmin(User, db.session, name='Users', endpoint='admin_user'))
+admin.add_view(GalleryImageAdmin(GalleryImage, db.session, name='Gallery Images', endpoint='admin_galleryimage'))
+admin.add_view(PlaceAdmin(Place, db.session, name='Places', endpoint='admin_place'))
+admin.add_view(SiteSettingsAdmin(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
 admin.add_view(TourPackageAdmin(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
-admin.add_view(SecureModelView(GalleryImage, db.session, name='Gallery Images', endpoint='admin_galleryimage'))
-# admin.add_view(SecureModelView(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
-
-admin.add_view(SecureModelView(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
-# admin.add_view(SecureModelView(Booking, db.session, name='Bookings', endpoint='admin_booking'))
-
+admin.add_view(BookingAdmin(Booking, db.session, name='Bookings', endpoint='admin_booking'))
+admin.add_view(TestimonialAdmin(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
+admin.add_view(SupportTicketAdmin(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
+admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
 admin.add_view(SecureModelView(EmailSettings, db.session, name='Email Settings', endpoint='admin_emailsettings'))
 admin.add_view(SecureModelView(Blog, db.session, name='Blog', endpoint='admin_blog'))
 admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint='admin_emaillog'))
-admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
-# admin.add_view(SecureModelView(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
-
-
-admin.add_link(MenuLink(name='Logout', category='', url='/logout'))
-admin.add_link(MenuLink(name='Analytics', category='', url='/admin/analytics'))
+admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
 
 # --- Export Bookings as CSV ---
 from flask_login import login_required
@@ -521,100 +503,983 @@ class SupportTicketAdmin(SecureModelView):
                 flash(f"Failed to send support ticket update email: {e}", 'danger')
         return super().on_model_change(form, model, is_created)
 
-# Register custom admin views for Booking, Testimonial, and SupportTicket (with status dropdowns)
-admin.add_view(BookingAdmin(Booking, db.session, name='Bookings'))
-admin.add_view(TestimonialAdmin(Testimonial, db.session, name='Testimonials'))
-admin.add_view(SupportTicketAdmin(SupportTicket, db.session, name='Support Tickets'))
+# Register models with Flask-Admin
+from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay, EmailTemplate
 
-from flask_admin import helpers as admin_helpers
-
-# Register custom admin template context for help/preview
-@app.context_processor
-def inject_admin_helpers():
-    return dict(admin_helpers=admin_helpers)
-
-def log_email(to, subject, body, status, error=None):
-    try:
-        from models import EmailLog
-        log = EmailLog(
-            recipient=to,
-            subject=subject,
-            body=body,
-            status=status,
-            error=error,
-            sent_at=datetime.utcnow()
-        )
-        db.session.add(log)
-        db.session.commit()
-    except Exception as e:
-        pass  # Avoid infinite recursion if logging fails
-
-def apply_email_settings():
-    from models import EmailSettings
-    settings = EmailSettings.query.first()
-    if settings:
-        app.config['MAIL_SERVER'] = settings.smtp_server or app.config['MAIL_SERVER']
-        app.config['MAIL_PORT'] = settings.smtp_port or app.config['MAIL_PORT']
-        app.config['MAIL_USE_TLS'] = bool(settings.use_tls) if settings.use_tls is not None else app.config['MAIL_USE_TLS']
-        app.config['MAIL_USE_SSL'] = bool(settings.use_ssl) if settings.use_ssl is not None else app.config['MAIL_USE_SSL']
-        app.config['MAIL_USERNAME'] = settings.username or app.config['MAIL_USERNAME']
-        app.config['MAIL_PASSWORD'] = settings.password or app.config['MAIL_PASSWORD']
-        app.config['MAIL_DEFAULT_SENDER'] = settings.default_sender or app.config['MAIL_DEFAULT_SENDER']
-        mail.init_app(app)
-
-from flask import render_template_string
-
-def render_email_template(template_name, context):
-    from models import EmailTemplate
-    template = EmailTemplate.query.filter_by(name=template_name).first()
-    if template:
-        # Use admin-edited template from DB
-        subject = render_template_string(template.subject, **context)
-        html = render_template_string(template.html_content, **context)
-        return subject, html
-    # Fallback to file-based template
-    subject = context.get('subject', '')
-    html = render_template(f'emails/{template_name}.html', **context)
-    return subject, html
-
-from flask_admin.form import rules
-from wtforms import TextAreaField, StringField
-from wtforms.widgets import TextArea, TextInput
-
-class EmailTemplateAdmin(SecureModelView):
-    form_columns = ['name', 'subject', 'html_content']
-    form_overrides = {
-        'subject': StringField,
-        'html_content': TextAreaField
-    }
-    form_widget_args = {
-        'subject': {
-            'placeholder': 'Subject line for the email (e.g. Your Booking is Confirmed)',
-            'style': 'font-weight:bold; font-size:1.1em;'
-        },
-        'html_content': {
-            'rows': 16,
-            'style': 'font-family:monospace; font-size:1em;',
-            'placeholder': '<h1>Dear {{ name }}</h1>\n<p>Your booking is confirmed!</p>'
-        }
-    }
-    form_create_rules = [
-        rules.Field('name'),
-        rules.Field('subject'),
-        rules.Text('You can use Jinja variables like <code>{{ name }}</code>, <code>{{ status }}</code>, etc. in the subject and content.'),
-        rules.Field('html_content')
-    ]
-    form_edit_rules = form_create_rules
-    can_view_details = True
-    can_export = True
-    column_searchable_list = ['name', 'subject']
-    column_filters = ['name']
-    column_editable_list = ['subject']
-    column_list = ['name', 'subject', 'updated_at']
-    column_default_sort = ('updated_at', True)
-
-# Register improved EmailTemplate admin view
+# Register custom UserAdmin view and other admin views AFTER all admin classes are defined
+admin.add_view(UserAdmin(User, db.session, name='Users', endpoint='admin_user'))
+admin.add_view(GalleryImageAdmin(GalleryImage, db.session, name='Gallery Images', endpoint='admin_galleryimage'))
+admin.add_view(PlaceAdmin(Place, db.session, name='Places', endpoint='admin_place'))
+admin.add_view(SiteSettingsAdmin(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
+admin.add_view(TourPackageAdmin(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
+admin.add_view(BookingAdmin(Booking, db.session, name='Bookings', endpoint='admin_booking'))
+admin.add_view(TestimonialAdmin(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
+admin.add_view(SupportTicketAdmin(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
+admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
+admin.add_view(SecureModelView(EmailSettings, db.session, name='Email Settings', endpoint='admin_emailsettings'))
+admin.add_view(SecureModelView(Blog, db.session, name='Blog', endpoint='admin_blog'))
+admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint='admin_emaillog'))
 admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# --- Export Bookings as CSV ---
+from flask_login import login_required
+import io
+import csv
+@app.route('/admin/export_bookings')
+@login_required
+def export_bookings():
+    from models import Booking
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    bookings = Booking.query.order_by(Booking.date.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Email', 'Phone', 'Package', 'Date', 'Message'])
+    for b in bookings:
+        writer.writerow([
+            b.id, b.name, b.email, b.phone, b.package, b.date.strftime('%Y-%m-%d %H:%M'), b.message
+        ])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='bookings.csv')
+
+# --- Add Export Link to Admin ---
+admin.add_link(MenuLink(name='Export Bookings (CSV)', category='', url='/admin/export_bookings'))
+
+# Payment integration placeholder (in booking route, to be implemented)
+
+# Export endpoints for testimonials, users, packages
+@app.route('/admin/export_testimonials')
+@login_required
+def export_testimonials():
+    from models import Testimonial
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    testimonials = Testimonial.query.order_by(Testimonial.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Content', 'Date'])
+    for t in testimonials:
+        writer.writerow([t.id, t.name, t.content, t.date])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='testimonials.csv')
+@app.route('/admin/export_users')
+@login_required
+def export_users():
+    from models import User
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    users = User.query.order_by(User.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Username', 'Is Admin'])
+    for u in users:
+        writer.writerow([u.id, u.username, u.is_admin])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='users.csv')
+@app.route('/admin/export_packages')
+@login_required
+def export_packages():
+    from models import TourPackage
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    packages = TourPackage.query.order_by(TourPackage.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Title', 'Description', 'Price', 'Duration'])
+    for p in packages:
+        writer.writerow([p.id, p.title, p.description, p.price, p.duration])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='packages.csv')
+# Add export links to admin
+admin.add_link(MenuLink(name='Export Testimonials (CSV)', category='', url='/admin/export_testimonials'))
+admin.add_link(MenuLink(name='Export Users (CSV)', category='', url='/admin/export_users'))
+admin.add_link(MenuLink(name='Export Packages (CSV)', category='', url='/admin/export_packages'))
+
+# Flask-Babel for i18n
+app.config['BABEL_DEFAULT_LOCALE'] = 'en'
+
+@login_manager.user_loader
+def load_user(user_id):
+    from models import User
+    return db.session.get(User, int(user_id))
+
+login_manager.login_view = 'main.login'  # Redirect to login page if not authenticated
+
+@app.errorhandler(404)
+def not_found(e):
+    from models import SiteSettings
+    settings = SiteSettings.query.first()
+    return render_template('404.html', site_settings=settings), 404
+
+migrate = Migrate(app, db)
+
+# Custom Flask-Admin views for Booking, Testimonial, and SupportTicket
+from flask_admin.form import Select2Widget
+from wtforms.fields import SelectField
+from flask_admin.model.helpers import get_mdict_item_or_list
+
+class BookingAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Booking Status Updated: {model.status}"}
+                    subject, html = render_email_template('booking_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Booking Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Booking Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send booking update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class TestimonialAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('Rejected', 'Rejected')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Testimonial Status Updated: {model.status}"}
+                    subject, html = render_email_template('testimonial_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Testimonial Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Testimonial Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour testimonial status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send testimonial update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class SupportTicketAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Open', 'Open'), ('In Progress', 'In Progress'), ('Closed', 'Closed')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Support Ticket Status Updated: {model.status}"}
+                    subject, html = render_email_template('support_ticket', context)
+                    msg = Message(
+                        subject=subject or f"Your Support Ticket Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Support Ticket Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour support ticket status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send support ticket update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+# Register models with Flask-Admin
+from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay, EmailTemplate
+
+# Register custom UserAdmin view and other admin views AFTER all admin classes are defined
+admin.add_view(UserAdmin(User, db.session, name='Users', endpoint='admin_user'))
+admin.add_view(GalleryImageAdmin(GalleryImage, db.session, name='Gallery Images', endpoint='admin_galleryimage'))
+admin.add_view(PlaceAdmin(Place, db.session, name='Places', endpoint='admin_place'))
+admin.add_view(SiteSettingsAdmin(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
+admin.add_view(TourPackageAdmin(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
+admin.add_view(BookingAdmin(Booking, db.session, name='Bookings', endpoint='admin_booking'))
+admin.add_view(TestimonialAdmin(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
+admin.add_view(SupportTicketAdmin(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
+admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
+admin.add_view(SecureModelView(EmailSettings, db.session, name='Email Settings', endpoint='admin_emailsettings'))
+admin.add_view(SecureModelView(Blog, db.session, name='Blog', endpoint='admin_blog'))
+admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint='admin_emaillog'))
+admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
+
+# --- Export Bookings as CSV ---
+from flask_login import login_required
+import io
+import csv
+@app.route('/admin/export_bookings')
+@login_required
+def export_bookings():
+    from models import Booking
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    bookings = Booking.query.order_by(Booking.date.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Email', 'Phone', 'Package', 'Date', 'Message'])
+    for b in bookings:
+        writer.writerow([
+            b.id, b.name, b.email, b.phone, b.package, b.date.strftime('%Y-%m-%d %H:%M'), b.message
+        ])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='bookings.csv')
+
+# --- Add Export Link to Admin ---
+admin.add_link(MenuLink(name='Export Bookings (CSV)', category='', url='/admin/export_bookings'))
+
+# Payment integration placeholder (in booking route, to be implemented)
+
+# Export endpoints for testimonials, users, packages
+@app.route('/admin/export_testimonials')
+@login_required
+def export_testimonials():
+    from models import Testimonial
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    testimonials = Testimonial.query.order_by(Testimonial.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Content', 'Date'])
+    for t in testimonials:
+        writer.writerow([t.id, t.name, t.content, t.date])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='testimonials.csv')
+@app.route('/admin/export_users')
+@login_required
+def export_users():
+    from models import User
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    users = User.query.order_by(User.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Username', 'Is Admin'])
+    for u in users:
+        writer.writerow([u.id, u.username, u.is_admin])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='users.csv')
+@app.route('/admin/export_packages')
+@login_required
+def export_packages():
+    from models import TourPackage
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    packages = TourPackage.query.order_by(TourPackage.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Title', 'Description', 'Price', 'Duration'])
+    for p in packages:
+        writer.writerow([p.id, p.title, p.description, p.price, p.duration])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='packages.csv')
+# Add export links to admin
+admin.add_link(MenuLink(name='Export Testimonials (CSV)', category='', url='/admin/export_testimonials'))
+admin.add_link(MenuLink(name='Export Users (CSV)', category='', url='/admin/export_users'))
+admin.add_link(MenuLink(name='Export Packages (CSV)', category='', url='/admin/export_packages'))
+
+# Flask-Babel for i18n
+app.config['BABEL_DEFAULT_LOCALE'] = 'en'
+
+@login_manager.user_loader
+def load_user(user_id):
+    from models import User
+    return db.session.get(User, int(user_id))
+
+login_manager.login_view = 'main.login'  # Redirect to login page if not authenticated
+
+@app.errorhandler(404)
+def not_found(e):
+    from models import SiteSettings
+    settings = SiteSettings.query.first()
+    return render_template('404.html', site_settings=settings), 404
+
+migrate = Migrate(app, db)
+
+# Custom Flask-Admin views for Booking, Testimonial, and SupportTicket
+from flask_admin.form import Select2Widget
+from wtforms.fields import SelectField
+from flask_admin.model.helpers import get_mdict_item_or_list
+
+class BookingAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Booking Status Updated: {model.status}"}
+                    subject, html = render_email_template('booking_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Booking Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Booking Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send booking update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class TestimonialAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('Rejected', 'Rejected')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Testimonial Status Updated: {model.status}"}
+                    subject, html = render_email_template('testimonial_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Testimonial Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Testimonial Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour testimonial status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send testimonial update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class SupportTicketAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Open', 'Open'), ('In Progress', 'In Progress'), ('Closed', 'Closed')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Support Ticket Status Updated: {model.status}"}
+                    subject, html = render_email_template('support_ticket', context)
+                    msg = Message(
+                        subject=subject or f"Your Support Ticket Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Support Ticket Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour support ticket status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send support ticket update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+# Register models with Flask-Admin
+from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay, EmailTemplate
+
+# Register custom UserAdmin view and other admin views AFTER all admin classes are defined
+admin.add_view(UserAdmin(User, db.session, name='Users', endpoint='admin_user'))
+admin.add_view(GalleryImageAdmin(GalleryImage, db.session, name='Gallery Images', endpoint='admin_galleryimage'))
+admin.add_view(PlaceAdmin(Place, db.session, name='Places', endpoint='admin_place'))
+admin.add_view(SiteSettingsAdmin(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
+admin.add_view(TourPackageAdmin(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
+admin.add_view(BookingAdmin(Booking, db.session, name='Bookings', endpoint='admin_booking'))
+admin.add_view(TestimonialAdmin(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
+admin.add_view(SupportTicketAdmin(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
+admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
+admin.add_view(SecureModelView(EmailSettings, db.session, name='Email Settings', endpoint='admin_emailsettings'))
+admin.add_view(SecureModelView(Blog, db.session, name='Blog', endpoint='admin_blog'))
+admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint='admin_emaillog'))
+admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
+
+# --- Export Bookings as CSV ---
+from flask_login import login_required
+import io
+import csv
+@app.route('/admin/export_bookings')
+@login_required
+def export_bookings():
+    from models import Booking
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    bookings = Booking.query.order_by(Booking.date.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Email', 'Phone', 'Package', 'Date', 'Message'])
+    for b in bookings:
+        writer.writerow([
+            b.id, b.name, b.email, b.phone, b.package, b.date.strftime('%Y-%m-%d %H:%M'), b.message
+        ])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='bookings.csv')
+
+# --- Add Export Link to Admin ---
+admin.add_link(MenuLink(name='Export Bookings (CSV)', category='', url='/admin/export_bookings'))
+
+# Payment integration placeholder (in booking route, to be implemented)
+
+# Export endpoints for testimonials, users, packages
+@app.route('/admin/export_testimonials')
+@login_required
+def export_testimonials():
+    from models import Testimonial
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    testimonials = Testimonial.query.order_by(Testimonial.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Content', 'Date'])
+    for t in testimonials:
+        writer.writerow([t.id, t.name, t.content, t.date])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='testimonials.csv')
+@app.route('/admin/export_users')
+@login_required
+def export_users():
+    from models import User
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    users = User.query.order_by(User.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Username', 'Is Admin'])
+    for u in users:
+        writer.writerow([u.id, u.username, u.is_admin])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='users.csv')
+@app.route('/admin/export_packages')
+@login_required
+def export_packages():
+    from models import TourPackage
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    packages = TourPackage.query.order_by(TourPackage.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Title', 'Description', 'Price', 'Duration'])
+    for p in packages:
+        writer.writerow([p.id, p.title, p.description, p.price, p.duration])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='packages.csv')
+# Add export links to admin
+admin.add_link(MenuLink(name='Export Testimonials (CSV)', category='', url='/admin/export_testimonials'))
+admin.add_link(MenuLink(name='Export Users (CSV)', category='', url='/admin/export_users'))
+admin.add_link(MenuLink(name='Export Packages (CSV)', category='', url='/admin/export_packages'))
+
+# Flask-Babel for i18n
+app.config['BABEL_DEFAULT_LOCALE'] = 'en'
+
+@login_manager.user_loader
+def load_user(user_id):
+    from models import User
+    return db.session.get(User, int(user_id))
+
+login_manager.login_view = 'main.login'  # Redirect to login page if not authenticated
+
+@app.errorhandler(404)
+def not_found(e):
+    from models import SiteSettings
+    settings = SiteSettings.query.first()
+    return render_template('404.html', site_settings=settings), 404
+
+migrate = Migrate(app, db)
+
+# Custom Flask-Admin views for Booking, Testimonial, and SupportTicket
+from flask_admin.form import Select2Widget
+from wtforms.fields import SelectField
+from flask_admin.model.helpers import get_mdict_item_or_list
+
+class BookingAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Booking Status Updated: {model.status}"}
+                    subject, html = render_email_template('booking_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Booking Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Booking Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send booking update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class TestimonialAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('Rejected', 'Rejected')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Testimonial Status Updated: {model.status}"}
+                    subject, html = render_email_template('testimonial_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Testimonial Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Testimonial Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour testimonial status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send testimonial update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class SupportTicketAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Open', 'Open'), ('In Progress', 'In Progress'), ('Closed', 'Closed')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Support Ticket Status Updated: {model.status}"}
+                    subject, html = render_email_template('support_ticket', context)
+                    msg = Message(
+                        subject=subject or f"Your Support Ticket Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Support Ticket Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour support ticket status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send support ticket update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+# Register models with Flask-Admin
+from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay, EmailTemplate
+
+# Register custom UserAdmin view and other admin views AFTER all admin classes are defined
+admin.add_view(UserAdmin(User, db.session, name='Users', endpoint='admin_user'))
+admin.add_view(GalleryImageAdmin(GalleryImage, db.session, name='Gallery Images', endpoint='admin_galleryimage'))
+admin.add_view(PlaceAdmin(Place, db.session, name='Places', endpoint='admin_place'))
+admin.add_view(SiteSettingsAdmin(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
+admin.add_view(TourPackageAdmin(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
+admin.add_view(BookingAdmin(Booking, db.session, name='Bookings', endpoint='admin_booking'))
+admin.add_view(TestimonialAdmin(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
+admin.add_view(SupportTicketAdmin(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
+admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
+admin.add_view(SecureModelView(EmailSettings, db.session, name='Email Settings', endpoint='admin_emailsettings'))
+admin.add_view(SecureModelView(Blog, db.session, name='Blog', endpoint='admin_blog'))
+admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint='admin_emaillog'))
+admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
+
+# --- Export Bookings as CSV ---
+from flask_login import login_required
+import io
+import csv
+@app.route('/admin/export_bookings')
+@login_required
+def export_bookings():
+    from models import Booking
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    bookings = Booking.query.order_by(Booking.date.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Email', 'Phone', 'Package', 'Date', 'Message'])
+    for b in bookings:
+        writer.writerow([
+            b.id, b.name, b.email, b.phone, b.package, b.date.strftime('%Y-%m-%d %H:%M'), b.message
+        ])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='bookings.csv')
+
+# --- Add Export Link to Admin ---
+admin.add_link(MenuLink(name='Export Bookings (CSV)', category='', url='/admin/export_bookings'))
+
+# Payment integration placeholder (in booking route, to be implemented)
+
+# Export endpoints for testimonials, users, packages
+@app.route('/admin/export_testimonials')
+@login_required
+def export_testimonials():
+    from models import Testimonial
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    testimonials = Testimonial.query.order_by(Testimonial.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Content', 'Date'])
+    for t in testimonials:
+        writer.writerow([t.id, t.name, t.content, t.date])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='testimonials.csv')
+@app.route('/admin/export_users')
+@login_required
+def export_users():
+    from models import User
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    users = User.query.order_by(User.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Username', 'Is Admin'])
+    for u in users:
+        writer.writerow([u.id, u.username, u.is_admin])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='users.csv')
+@app.route('/admin/export_packages')
+@login_required
+def export_packages():
+    from models import TourPackage
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    packages = TourPackage.query.order_by(TourPackage.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Title', 'Description', 'Price', 'Duration'])
+    for p in packages:
+        writer.writerow([p.id, p.title, p.description, p.price, p.duration])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='packages.csv')
+# Add export links to admin
+admin.add_link(MenuLink(name='Export Testimonials (CSV)', category='', url='/admin/export_testimonials'))
+admin.add_link(MenuLink(name='Export Users (CSV)', category='', url='/admin/export_users'))
+admin.add_link(MenuLink(name='Export Packages (CSV)', category='', url='/admin/export_packages'))
+
+# Flask-Babel for i18n
+app.config['BABEL_DEFAULT_LOCALE'] = 'en'
+
+@login_manager.user_loader
+def load_user(user_id):
+    from models import User
+    return db.session.get(User, int(user_id))
+
+login_manager.login_view = 'main.login'  # Redirect to login page if not authenticated
+
+@app.errorhandler(404)
+def not_found(e):
+    from models import SiteSettings
+    settings = SiteSettings.query.first()
+    return render_template('404.html', site_settings=settings), 404
+
+migrate = Migrate(app, db)
+
+# Custom Flask-Admin views for Booking, Testimonial, and SupportTicket
+from flask_admin.form import Select2Widget
+from wtforms.fields import SelectField
+from flask_admin.model.helpers import get_mdict_item_or_list
+
+class BookingAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Booking Status Updated: {model.status}"}
+                    subject, html = render_email_template('booking_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Booking Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Booking Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send booking update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class TestimonialAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('Rejected', 'Rejected')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Testimonial Status Updated: {model.status}"}
+                    subject, html = render_email_template('testimonial_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Testimonial Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Testimonial Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour testimonial status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send testimonial update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class SupportTicketAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Open', 'Open'), ('In Progress', 'In Progress'), ('Closed', 'Closed')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Support Ticket Status Updated: {model.status}"}
+                    subject, html = render_email_template('support_ticket', context)
+                    msg = Message(
+                        subject=subject or f"Your Support Ticket Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Support Ticket Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour support ticket status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send support ticket update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+# Register models with Flask-Admin
+from models import User, Place, TourPackage, GalleryImage, Testimonial, SiteSettings, Booking, EmailSettings, Blog, EmailLog, FAQ, SupportTicket, ItineraryDay, EmailTemplate
+
+# Register custom UserAdmin view and other admin views AFTER all admin classes are defined
+admin.add_view(UserAdmin(User, db.session, name='Users', endpoint='admin_user'))
+admin.add_view(GalleryImageAdmin(GalleryImage, db.session, name='Gallery Images', endpoint='admin_galleryimage'))
+admin.add_view(PlaceAdmin(Place, db.session, name='Places', endpoint='admin_place'))
+admin.add_view(SiteSettingsAdmin(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
+admin.add_view(TourPackageAdmin(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
+admin.add_view(BookingAdmin(Booking, db.session, name='Bookings', endpoint='admin_booking'))
+admin.add_view(TestimonialAdmin(Testimonial, db.session, name='Testimonials', endpoint='admin_testimonial'))
+admin.add_view(SupportTicketAdmin(SupportTicket, db.session, name='Support Tickets', endpoint='admin_supportticket'))
+admin.add_view(SecureModelView(FAQ, db.session, name='FAQs', endpoint='admin_faq'))
+admin.add_view(SecureModelView(EmailSettings, db.session, name='Email Settings', endpoint='admin_emailsettings'))
+admin.add_view(SecureModelView(Blog, db.session, name='Blog', endpoint='admin_blog'))
+admin.add_view(SecureModelView(EmailLog, db.session, name='Email Logs', endpoint='admin_emaillog'))
+admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
+
+# --- Export Bookings as CSV ---
+from flask_login import login_required
+import io
+import csv
+@app.route('/admin/export_bookings')
+@login_required
+def export_bookings():
+    from models import Booking
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    bookings = Booking.query.order_by(Booking.date.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Email', 'Phone', 'Package', 'Date', 'Message'])
+    for b in bookings:
+        writer.writerow([
+            b.id, b.name, b.email, b.phone, b.package, b.date.strftime('%Y-%m-%d %H:%M'), b.message
+        ])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='bookings.csv')
+
+# --- Add Export Link to Admin ---
+admin.add_link(MenuLink(name='Export Bookings (CSV)', category='', url='/admin/export_bookings'))
+
+# Payment integration placeholder (in booking route, to be implemented)
+
+# Export endpoints for testimonials, users, packages
+@app.route('/admin/export_testimonials')
+@login_required
+def export_testimonials():
+    from models import Testimonial
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    testimonials = Testimonial.query.order_by(Testimonial.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Name', 'Content', 'Date'])
+    for t in testimonials:
+        writer.writerow([t.id, t.name, t.content, t.date])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='testimonials.csv')
+@app.route('/admin/export_users')
+@login_required
+def export_users():
+    from models import User
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    users = User.query.order_by(User.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Username', 'Is Admin'])
+    for u in users:
+        writer.writerow([u.id, u.username, u.is_admin])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='users.csv')
+@app.route('/admin/export_packages')
+@login_required
+def export_packages():
+    from models import TourPackage
+    if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
+        return redirect(url_for('main.login'))
+    packages = TourPackage.query.order_by(TourPackage.id.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Title', 'Description', 'Price', 'Duration'])
+    for p in packages:
+        writer.writerow([p.id, p.title, p.description, p.price, p.duration])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='packages.csv')
+# Add export links to admin
+admin.add_link(MenuLink(name='Export Testimonials (CSV)', category='', url='/admin/export_testimonials'))
+admin.add_link(MenuLink(name='Export Users (CSV)', category='', url='/admin/export_users'))
+admin.add_link(MenuLink(name='Export Packages (CSV)', category='', url='/admin/export_packages'))
+
+# Flask-Babel for i18n
+app.config['BABEL_DEFAULT_LOCALE'] = 'en'
+
+@login_manager.user_loader
+def load_user(user_id):
+    from models import User
+    return db.session.get(User, int(user_id))
+
+login_manager.login_view = 'main.login'  # Redirect to login page if not authenticated
+
+@app.errorhandler(404)
+def not_found(e):
+    from models import SiteSettings
+    settings = SiteSettings.query.first()
+    return render_template('404.html', site_settings=settings), 404
+
+migrate = Migrate(app, db)
+
+# Custom Flask-Admin views for Booking, Testimonial, and SupportTicket
+from flask_admin.form import Select2Widget
+from wtforms.fields import SelectField
+from flask_admin.model.helpers import get_mdict_item_or_list
+
+class BookingAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Booking Status Updated: {model.status}"}
+                    subject, html = render_email_template('booking_confirmation', context)
+                    msg = Message(
+                        subject=subject or f"Your Booking Status Updated: {model.status}",
+                        recipients=[model.email],
+                        html=html
+                    )
+                    mail.send(msg)
+                    log_email(model.email, msg.subject, msg.html, 'sent')
+            except Exception as e:
+                log_email(model.email if hasattr(model, 'email') else '',
+                          f"Your Booking Status Updated: {getattr(model, 'status', '')}",
+                          f"Dear {getattr(model, 'name', 'User')},\n\nYour booking status has been updated to: {getattr(model, 'status', '')}.",
+                          'failed', str(e))
+                flash(f"Failed to send booking update email: {e}", 'danger')
+        return super().on_model_change(form, model, is_created)
+
+class TestimonialAdmin(SecureModelView):
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Pending', 'Pending'), ('Approved', 'Approved'), ('Rejected', 'Rejected')],
+            widget=Select2Widget()
+        )
+    )
+    def on_model_change(self, form, model, is_created):
+        if not is_created:
+            try:
+                if hasattr(model, 'email') and model.email:
+                    apply_email_settings()
+                    context = {'name': getattr(model, 'name', 'User'), 'status': model.status, 'subject': f"Your Testimonial Status Updated: {model.status}"}
+                    subject, html = render_email_template('testimonial_confirmation
