@@ -77,6 +77,73 @@
     </div>
   </div>
 </div>
+<div class="row text-center mb-4">
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-primary"><i class="fa fa-envelope"></i></h4>
+        <p class="mb-0">Email Settings</p>
+        <a href="{{ url_for('admin_emailsettings.index_view') }}" class="btn btn-outline-primary btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-success"><i class="fa fa-file-alt"></i></h4>
+        <p class="mb-0">Email Templates</p>
+        <a href="{{ url_for('admin_emailtemplate.index_view') }}" class="btn btn-outline-success btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-info"><i class="fa fa-history"></i></h4>
+        <p class="mb-0">Email Logs</p>
+        <a href="{{ url_for('admin_emaillog.index_view') }}" class="btn btn-outline-info btn-sm mt-2">View</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-warning"><i class="fa fa-list"></i></h4>
+        <p class="mb-0">Activity Log</p>
+        <a href="{{ url_for('admin_activitylog.index_view') }}" class="btn btn-outline-warning btn-sm mt-2">View</a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row text-center mb-4">
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-secondary"><i class="fa fa-blog"></i></h4>
+        <p class="mb-0">Blog</p>
+        <a href="{{ url_for('admin_blog.index_view') }}" class="btn btn-outline-secondary btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-info"><i class="fa fa-question-circle"></i></h4>
+        <p class="mb-0">FAQs</p>
+        <a href="{{ url_for('admin_faq.index_view') }}" class="btn btn-outline-info btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-dark"><i class="fa fa-ticket-alt"></i></h4>
+        <p class="mb-0">Support Tickets</p>
+        <a href="{{ url_for('admin_supportticket.index_view') }}" class="btn btn-outline-dark btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="row mb-4">
   <div class="col-md-6">
     <div class="card shadow border-0 mb-3">

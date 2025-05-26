@@ -93,6 +93,9 @@ class SiteSettings(db.Model):
     about = db.Column(db.Text)
     google_analytics_id = db.Column(db.String(32))
 
+    def __str__(self):
+        return self.site_name or f"SiteSettings #{self.id}"
+
 class EmailSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     smtp_server = db.Column(db.String(120), default='smtp.gmail.com')

@@ -2,7 +2,7 @@ from flask import Flask, render_template, send_file, request, flash
 from extensions import db, mail, babel, limiter
 from flask_login import LoginManager
 from flask_admin import Admin
-from flask_admin.contrib.sqla import ModelView
+from flask_admin.contrib.sqla import ModelView as FlaskAdminModelView
 from wtforms.fields import PasswordField, SelectField
 from flask_admin.form import ImageUploadField, FileUploadField, Select2Widget
 from wtforms_sqlalchemy.fields import QuerySelectMultipleField
@@ -63,7 +63,13 @@ from flask_admin.babel import gettext
 from flask_admin.model.template import macro
 from flask import Markup, jsonify, abort
 
-class SecureModelView(ModelView):
+class PatchedModelView(FlaskAdminModelView):
+    def render(self, template, **kwargs):
+        from models import SiteSettings
+        kwargs.setdefault('site_settings', SiteSettings.query.first())
+        return super().render(template, **kwargs)
+
+class SecureModelView(PatchedModelView):
     def is_accessible(self):
         from flask_login import current_user
         return current_user.is_authenticated and getattr(current_user, 'role', 'admin') in ['admin', 'superadmin']
@@ -85,6 +91,10 @@ class SecureModelView(ModelView):
         action = f"Deleted {self.model.__name__} (ID: {getattr(model, 'id', None)})"
         self.log_activity(action)
         return super().on_model_delete(model)
+    def render(self, template, **kwargs):
+        from models import SiteSettings
+        kwargs.setdefault('site_settings', SiteSettings.query.first())
+        return super().render(template, **kwargs)
 
 class CustomAdminIndexView(AdminIndexView):
     @expose('/')
@@ -253,7 +263,7 @@ class UniqueVideoUploadField(FileUploadField):
                     raise ValueError('Invalid video file.')
         super().pre_validate(form)
 
-class PlaceAdmin(ModelView):
+class PlaceAdmin(PatchedModelView):
     form_extra_fields = {
         'image': ImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'places'), allow_overwrite=True)
     }
@@ -391,21 +401,7 @@ class BookingAdmin(SecureModelView):
     can_create = True
     can_delete = True
     can_edit_inline = True
-    list_template = 'admin/model/list_with_actions.html'
-    column_extra_row_actions = [
-        {
-            'label': 'Confirm',
-            'icon': 'fa fa-check',
-            'action': 'confirm',
-            'visible': lambda model: model.status != 'Confirmed'
-        },
-        {
-            'label': 'Cancel',
-            'icon': 'fa fa-times',
-            'action': 'cancel',
-            'visible': lambda model: model.status != 'Cancelled'
-        }
-    ]
+    list_template = 'admin/model/list_with_actions.html'  # For quick actions/details modal
 
     @action('confirm', 'Confirm', 'Are you sure you want to confirm selected bookings?')
     def action_confirm(self, ids):
@@ -443,7 +439,7 @@ class BookingAdmin(SecureModelView):
         actions['cancel'] = (self.action_cancel, 'cancel', 'Cancel')
         return actions
 
-class GalleryImageAdmin(ModelView):
+class GalleryImageAdmin(PatchedModelView):
     form_extra_fields = {
         'image': UniqueImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'gallery'), allow_overwrite=True),
         'video': UniqueVideoUploadField('Video', base_path=os.path.join(os.path.dirname(__file__), 'static', 'gallery'), allowed_extensions=['mp4'], allow_overwrite=True)
@@ -465,7 +461,7 @@ class GalleryImageAdmin(ModelView):
     column_display_all_relations = True
     column_formatters_export = {}
 
-class ItineraryDayAdmin(ModelView):
+class ItineraryDayAdmin(PatchedModelView):
     form_overrides = {'description': CKEditorField}
     form_columns = ['day_number', 'title', 'description']
     column_searchable_list = ['title', 'description']
@@ -475,7 +471,7 @@ class ItineraryDayAdmin(ModelView):
     can_create = True
     can_delete = True
 
-class TourPackageAdmin(ModelView):
+class TourPackageAdmin(PatchedModelView):
     # Add thumbnail for image field in list view
     form_extra_fields = {
         'image': UniqueImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'packages'), allow_overwrite=True)
@@ -492,7 +488,11 @@ class TourPackageAdmin(ModelView):
         'description': {'description': 'Full package description. Use formatting and images as needed.'},
         'price': {'description': 'Total price for the package (in INR).'},
         'duration': {'description': 'Number of days for the tour.'},
-        'places': {'description': 'Select all included places.'},
+        'places': {
+            'description': 'Select all included places.',
+            'get_label': lambda place: place.name,
+            'query_factory': lambda: Place.query.all(),
+        },
         'custom_destinations': {'description': 'Comma-separated list of custom destinations (optional).'},
         'itinerary': {'description': 'Full itinerary in rich text.'},
         'accommodations': {'description': 'Accommodation details.'},
@@ -634,6 +634,9 @@ class ActivityLogAdmin(SecureModelView):
     can_delete = True
 
 class SiteSettingsAdmin(SecureModelView):
+    form_extra_fields = {
+        'logo': ImageUploadField('Logo', base_path=os.path.join(os.path.dirname(__file__), 'static', 'uploads'), allow_overwrite=True)
+    }
     can_view_details = True
     can_edit = True
     can_create = True
@@ -743,6 +746,12 @@ def not_found(e):
     from models import SiteSettings
     settings = SiteSettings.query.first()
     return render_template('404.html', site_settings=settings), 404
+
+@app.errorhandler(500)
+def internal_error(e):
+    from models import SiteSettings
+    settings = SiteSettings.query.first()
+    return render_template('500.html', site_settings=settings), 500
 
 migrate = Migrate(app, db)
 

@@ -17,3 +17,4 @@ wtforms_sqlalchemy==0.2
 flask-ckeditor
 bleach
 Flask-Caching==2.0.0
+xhtml2pdf

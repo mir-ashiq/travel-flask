@@ -1,0 +1,16 @@
+{% extends 'admin/base.html' %}
+{% block body %}
+<div class="container mt-4">
+  <h2>Bulk Import Users</h2>
+  <form method="post" enctype="multipart/form-data">
+    {{ csrf_token() }}
+    <div class="form-group">
+      <label for="file">CSV File</label>
+      <input type="file" class="form-control" name="file" id="file" required>
+      <small class="form-text text-muted">CSV columns: username, password, is_admin</small>
+    </div>
+    <button type="submit" class="btn btn-primary">Import</button>
+    <a href="{{ url_for('admin_user.index_view') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}
