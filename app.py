@@ -637,10 +637,38 @@ class SiteSettingsAdmin(SecureModelView):
     form_extra_fields = {
         'logo': ImageUploadField('Logo', base_path=os.path.join(os.path.dirname(__file__), 'static', 'uploads'), allow_overwrite=True)
     }
+    # Specify the order: id, site_name, site_title, logo, then the rest
+    form_columns = [
+        'site_name',
+        'site_title',
+        'logo',
+        'phone',
+        'email',
+        'address',
+        'facebook',
+        'instagram',
+        'twitter',
+        'linkedin',
+        'youtube',
+        'whatsapp',
+        'telegram',
+        'meta_description',
+        'about',
+        'google_analytics_id'
+    ]
     can_view_details = True
     can_edit = True
     can_create = True
     can_delete = True
+
+    # Optional: Show image preview for logo in the form
+    def _logo_preview(view, context, model, name):
+        if model and model.logo:
+            return Markup(f'<img src="/static/uploads/{model.logo}" style="max-height:60px;">')
+        return ''
+    column_formatters = {
+        'logo': _logo_preview
+    }
 
 # Register admin views with advanced classes
 admin.add_view(PlaceAdmin(Place, db.session, name='Places', endpoint='admin_place'))
