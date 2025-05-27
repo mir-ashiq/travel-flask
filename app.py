@@ -8,6 +8,8 @@ from flask_admin.form import ImageUploadField, FileUploadField, Select2Widget
 from wtforms_sqlalchemy.fields import QuerySelectMultipleField
 from flask_wtf import CSRFProtect
 from flask_mail import Mail, Message
+from flask import render_template_string
+from models import EmailTemplate
 import os
 from flask_admin.menu import MenuLink
 import imghdr
@@ -609,6 +611,16 @@ class SupportTicketAdmin(SecureModelView):
     can_create = True
     can_delete = True
 
+    def on_model_change(self, form, model, is_created):
+        old = None
+        if not is_created:
+            old = self.session.query(self.model).get(model.id)
+        super().on_model_change(form, model, is_created)
+        # Send email if status or response changes
+        if not is_created and old and (old.status != model.status or old.response != model.response):
+            context = {'ticket': model}
+            send_templated_email(model.email, 'ticket_updated', context)
+
 class EmailSettingsAdmin(SecureModelView):
     can_view_details = True
     can_edit = True
@@ -824,6 +836,21 @@ def render_email_template(template_name, context):
         except Exception:
             html = f"<p>{subject}</p>"
         return subject, html
+
+def send_templated_email(to, template_name, context, subject=None):
+    template = EmailTemplate.query.filter_by(name=template_name).first()
+    if template:
+        html = render_template_string(template.html_content, **context)
+        subject = subject or template.subject
+    else:
+        # fallback: use a file in templates/emails/ or a default string
+        try:
+            html = render_template(f'emails/{template_name}.html', **context)
+        except Exception:
+            html = f"Dear user, your request has been processed."
+        subject = subject or "Notification from JKLG Travel"
+    msg = Message(subject, recipients=[to], html=html)
+    mail.send(msg)
 
 # --- Dark Mode Toggle (JS/CSS) ---
 # Add to base admin template (see below for template instructions)
