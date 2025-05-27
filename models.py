@@ -30,6 +30,8 @@ class Place(db.Model):
     description = db.Column(db.Text, nullable=False)
     region = db.Column(db.String(50), nullable=False)  # Jammu, Kashmir, Ladakh, Gurez
     image = db.Column(db.String(200))
+    featured_home = db.Column(db.Boolean, default=False)  # Show on homepage
+    featured_order = db.Column(db.Integer, default=0)     # Order on homepage
 
 class TourPackage(db.Model):
     id = db.Column(db.Integer, primary_key=True)

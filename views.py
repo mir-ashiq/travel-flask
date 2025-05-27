@@ -13,7 +13,7 @@ main = Blueprint('main', __name__)
 
 @main.route('/')
 def index():
-    featured_places = Place.query.all()
+    featured_places = Place.query.filter_by(featured_home=True).order_by(Place.featured_order.asc()).limit(6).all()
     featured_packages = TourPackage.query.all()
     testimonials = Testimonial.query.order_by(Testimonial.id.desc()).all()
     gallery = GalleryImage.query.all()

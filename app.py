@@ -342,21 +342,16 @@ class UniqueVideoUploadField(FileUploadField):
                     raise ValueError('Invalid video file.')
         super().pre_validate(form)
 
-class PlaceAdmin(PatchedModelView):
-    form_extra_fields = {
-        'image': ImageUploadField('Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'places'), allow_overwrite=True)
-    }
-    form_overrides = {'region': SelectField}
-    form_args = {
-        'region': {
-            'label': 'Region',
-            'choices': [('Jammu', 'Jammu'), ('Kashmir', 'Kashmir'), ('Ladakh', 'Ladakh'), ('Gurez', 'Gurez')],
-            'widget': Select2Widget()
-        }
-    }
-    form_columns = ['name', 'description', 'region', 'image']
-    column_searchable_list = ['name', 'description', 'region']
-    column_filters = ['region']
+class PlaceAdmin(SecureModelView):
+    form_columns = [
+        'name', 'description', 'region', 'image', 'featured_home', 'featured_order'
+    ]
+    column_list = [
+        'name', 'region', 'featured_home', 'featured_order'
+    ]
+    column_editable_list = ['featured_home', 'featured_order']
+    column_filters = ['region', 'featured_home']
+    column_searchable_list = ['name', 'region']
     can_view_details = True
     can_export = True
     can_edit = True
