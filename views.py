@@ -7,7 +7,7 @@ from flask_mail import Message
 from flask_babel import _
 from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
-from itsdangerous import URLSafeSerializer
+from itsdangerous import URLSafeSerializer, BadSignature
 
 main = Blueprint('main', __name__)
 
@@ -260,6 +260,36 @@ def contact():
 @main.route('/help')
 def help_center():
     return render_template('help.html')
+
+@main.route('/booking/confirm')
+def booking_confirm():
+    from models import Booking, SiteSettings
+    token = request.args.get('verify')
+    booking = None
+    confirmed = False
+    error = None
+    if token:
+        s = URLSafeSerializer(current_app.config['SECRET_KEY'], salt='booking-confirm')
+        try:
+            data = s.loads(token)
+            booking_id = data.get('booking_id')
+            email = data.get('email')
+            booking = Booking.query.filter_by(id=booking_id, email=email).first()
+            if booking:
+                if booking.status != 'Confirmed':
+                    booking.status = 'Confirmed'
+                    db.session.commit()
+                confirmed = True
+            else:
+                error = 'Booking not found.'
+        except BadSignature:
+            error = 'Invalid or expired confirmation link.'
+        except Exception as e:
+            error = str(e)
+    else:
+        error = 'Missing confirmation token.'
+    site_settings = SiteSettings.query.first()
+    return render_template('booking_confirmed.html', booking=booking, confirmed=confirmed, error=error, site_settings=site_settings)
 
 @main.context_processor
 def inject_site_settings():

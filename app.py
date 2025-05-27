@@ -108,6 +108,10 @@ def render_email_template(template_name, context):
         return subject, html
 
 def send_templated_email(to, template_name, context, subject=None):
+    # Ensure site_name is always in context
+    if 'site_name' not in context:
+        site_settings = SiteSettings.query.first()
+        context['site_name'] = site_settings.site_name if site_settings and site_settings.site_name else 'JKLG Travel'
     print(f"[send_templated_email] Called for to={to}, template_name={template_name}, context={context}, subject={subject}")
     try:
         template = EmailTemplate.query.filter_by(name=template_name).first()

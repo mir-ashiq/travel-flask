@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8 text-center">
+      {% if confirmed %}
+        <div class="alert alert-success my-4">
+          <h2 class="mb-3"><i class="fa fa-check-circle text-success"></i> Booking Confirmed!</h2>
+          <p>Thank you, <b>{{ booking.name }}</b>! Your booking for <b>{{ booking.package }}</b> has been successfully confirmed.</p>
+          <p>We look forward to welcoming you. Our team will contact you soon with further details.</p>
+        </div>
+        <a href="/" class="btn btn-primary mt-3">Back to Home</a>
+      {% elif error %}
+        <div class="alert alert-danger my-4">
+          <h2 class="mb-3"><i class="fa fa-times-circle text-danger"></i> Confirmation Failed</h2>
+          <p>{{ error }}</p>
+        </div>
+        <a href="/" class="btn btn-secondary mt-3">Back to Home</a>
+      {% else %}
+        <div class="alert alert-warning my-4">
+          <h2 class="mb-3"><i class="fa fa-info-circle text-warning"></i> Confirmation Pending</h2>
+          <p>We could not process your booking confirmation. Please check your link or contact support.</p>
+        </div>
+        <a href="/" class="btn btn-secondary mt-3">Back to Home</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

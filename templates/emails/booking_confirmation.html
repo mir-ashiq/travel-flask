@@ -4,7 +4,7 @@
     <p>Your booking for <b>{{ package }}</b> has been received.</p>
     <p>Message: {{ message }}</p>
     <p>To confirm your booking, please click the link below:</p>
-    <a href="{{ url_for('main.book', _external=True) }}?verify={{ verification_token }}" style="background:#28a745;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">Confirm Booking</a>
-    <p>We will contact you soon.<br>JKLG Travel Team</p>
+    <a href="{{ url_for('main.booking_confirm', _external=True) }}?verify={{ verification_token }}" style="background:#28a745;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">Confirm Booking</a>
+    <p>We will contact you soon.<br>{{ site_name }}</p>
   </body>
 </html>
