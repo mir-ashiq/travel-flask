@@ -8,6 +8,11 @@
     <span id="adminNotifications" class="badge bg-info text-dark" title="Notifications" style="cursor:pointer;">0</span>
   </div>
 </div>
+<div class="mb-3 d-flex justify-content-end">
+  <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary fw-bold">
+    <i class="fa fa-arrow-left me-1"></i> Back to Admin Dashboard
+  </a>
+</div>
 <hr>
 {% block body %}{% endblock %}
 <script>
