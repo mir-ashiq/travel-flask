@@ -696,6 +696,7 @@ admin.add_view(ActivityLogAdmin(ActivityLog, db.session, name='Activity Log', en
 admin.add_view(EmailTemplateAdmin(EmailTemplate, db.session, name='Email Templates', endpoint='admin_emailtemplate'))
 admin.add_view(TourPackageAdmin(TourPackage, db.session, name='Tour Packages', endpoint='admin_tourpackage'))
 admin.add_view(SiteSettingsAdmin(SiteSettings, db.session, name='Site Settings', endpoint='admin_sitesettings'))
+admin.add_view(UserAdmin(User, db.session, name='Users', endpoint='admin_user'))
 
 # --- Export Bookings as CSV ---
 from flask_login import login_required
