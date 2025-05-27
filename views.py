@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for
+from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
 from models import Place, TourPackage, GalleryImage, Testimonial, User, Booking, SiteSettings, EmailLog, Blog, ItineraryDay
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -7,6 +7,7 @@ from flask_mail import Message
 from flask_babel import _
 from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
+from itsdangerous import URLSafeSerializer
 
 main = Blueprint('main', __name__)
 
@@ -66,7 +67,8 @@ def testimonials():
     if request.method == 'POST':
         name = request.form['name']
         content = request.form['content']
-        t = Testimonial(name=name, content=content, status='Pending')
+        email = request.form.get('email')
+        t = Testimonial(name=name, email=email, content=content, status='Pending')
         db.session.add(t)
         db.session.commit()
         # Advanced: Notify admin of new testimonial and send confirmation to user
@@ -75,16 +77,15 @@ def testimonials():
             admin_email = settings.email if settings and settings.email else 'info@jklgtravel.com'
             msg = Message('New Testimonial Submitted', recipients=[admin_email])
             msg.body = f"""
-New testimonial submitted:\n\nName: {name}\nContent: {content}\n"""
+New testimonial submitted:\n\nName: {name}\nEmail: {email or '-'}\nContent: {content}\n"""
             mail.send(msg)
             db.session.add(EmailLog(to=admin_email, subject=msg.subject, body=msg.body, status='sent', error=''))
             # Confirmation to user (if email provided)
-            if 'email' in request.form and request.form['email']:
-                user_email = request.form['email']
-                user_msg = Message('Thank you for your testimonial!', recipients=[user_email])
+            if email:
+                user_msg = Message('Thank you for your testimonial!', recipients=[email])
                 user_msg.html = render_template('emails/testimonial_confirmation.html', name=name)
                 mail.send(user_msg)
-                db.session.add(EmailLog(to=user_email, subject=user_msg.subject, body=user_msg.html, status='sent', error=''))
+                db.session.add(EmailLog(to=email, subject=user_msg.subject, body=user_msg.html, status='sent', error=''))
             db.session.commit()
         except Exception as e:
             db.session.add(EmailLog(to=admin_email, subject='Testimonial Notification', body='', status='failed', error=str(e)))
@@ -119,20 +120,16 @@ def book():
         booking = Booking(name=name, email=email, phone=phone, package=package, message=message)
         db.session.add(booking)
         db.session.commit()
-        # Payment integration placeholder
-        # payment_url = get_payment_url(booking)
-        # Email verification for booking
-        verification_token = 'dummy-token'  # Generate real token in production
+        # Generate a real verification token
+        s = URLSafeSerializer(current_app.config['SECRET_KEY'], salt='booking-confirm')
+        verification_token = s.dumps({'booking_id': booking.id, 'email': email})
         try:
             settings = SiteSettings.query.first()
             admin_email = settings.email if settings and settings.email else 'info@jklgtravel.com'
-            # HTML email template for user
             user_msg = Message(_('Booking Confirmation - JKLG Travel'), recipients=[email])
             user_msg.html = render_template('emails/booking_confirmation.html', name=name, package=package, message=message, verification_token=verification_token)
             mail.send(user_msg)
-            # Log email
             db.session.add(EmailLog(to=email, subject=user_msg.subject, body=user_msg.html, status='sent', error=''))
-            # HTML email template for admin
             admin_msg = Message(_('New Booking Received'), recipients=[admin_email])
             admin_msg.html = render_template('emails/booking_admin.html', name=name, email=email, phone=phone, package=package, message=message)
             mail.send(admin_msg)

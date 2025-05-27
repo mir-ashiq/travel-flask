@@ -1,11 +1,11 @@
 <html>
 <body>
-    <p>Dear {{ ticket.name }},</p>
-    <p>Your support ticket (Subject: {{ ticket.subject }}) has been updated.</p>
-    <p>Status: {{ ticket.status }}</p>
-    {% if ticket.response %}
+    <p>Dear {{ name }},</p>
+    <p>Your support ticket (Subject: {{ subject }}) has been updated.</p>
+    <p>Status: {{ status }}</p>
+    {% if response %}
     <p>Response from our team:</p>
-    <blockquote>{{ ticket.response }}</blockquote>
+    <blockquote>{{ response }}</blockquote>
     {% endif %}
     <p>Best regards,<br>JKLG Travel Team</p>
 </body>

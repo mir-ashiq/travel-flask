@@ -65,6 +65,79 @@ from flask_admin.babel import gettext
 from flask_admin.model.template import macro
 from flask import Markup, jsonify, abort
 
+# --- Email Helper Functions ---
+def log_email(to, subject, body, status, error=None):
+    """Log email sending attempts to the EmailLog table."""
+    log = EmailLog(to=to, subject=subject, body=body, status=status, error=error or '')
+    db.session.add(log)
+    db.session.commit()
+
+def apply_email_settings():
+    """Apply the latest email settings from the database to Flask-Mail config."""
+    settings = EmailSettings.query.first()
+    if settings:
+        app.config['MAIL_SERVER'] = settings.smtp_server
+        app.config['MAIL_PORT'] = settings.smtp_port
+        app.config['MAIL_USE_TLS'] = settings.use_tls
+        app.config['MAIL_USE_SSL'] = settings.use_ssl
+        app.config['MAIL_USERNAME'] = settings.username
+        app.config['MAIL_PASSWORD'] = settings.password
+        app.config['MAIL_DEFAULT_SENDER'] = settings.default_sender
+        mail.init_app(app)
+
+
+def render_email_template(template_name, context):
+    """Render an email template from the EmailTemplate model or fallback to file."""
+    template = EmailTemplate.query.filter_by(name=template_name).first()
+    if template and template.html_content:
+        # Use subject and html_content from DB
+        subject = template.subject.format(**context) if template.subject else context.get('subject', '')
+        html = template.html_content
+        try:
+            html = html.format(**context)
+        except Exception:
+            pass  # If formatting fails, use raw html
+        return subject, html
+    else:
+        # Fallback to file-based template
+        subject = context.get('subject', '')
+        try:
+            html = render_template(f'emails/{template_name}.html', **context)
+        except Exception:
+            html = f"<p>{subject}</p>"
+        return subject, html
+
+def send_templated_email(to, template_name, context, subject=None):
+    print(f"[send_templated_email] Called for to={to}, template_name={template_name}, context={context}, subject={subject}")
+    try:
+        template = EmailTemplate.query.filter_by(name=template_name).first()
+        if template:
+            try:
+                html = render_template_string(template.html_content, **context)
+            except Exception as e:
+                print(f"[send_templated_email] Error rendering template string: {e}")
+                html = f"Dear user, your request has been processed. (Template error: {e})"
+            subject_final = subject or template.subject or "Notification from JKLG Travel"
+        else:
+            try:
+                html = render_template(f'emails/{template_name}.html', **context)
+            except Exception as e:
+                print(f"[send_templated_email] Error rendering file template: {e}")
+                html = f"Dear user, your request has been processed. (Template error: {e})"
+            subject_final = subject or "Notification from JKLG Travel"
+        print(f"[send_templated_email] About to send email to {to} with subject '{subject_final}'")
+        msg = Message(subject_final, recipients=[to], html=html)
+        try:
+            mail.send(msg)
+            print(f"[send_templated_email] Email sent to {to}")
+            log_email(to, subject_final, html, status='Sent')
+        except Exception as e:
+            print(f"[send_templated_email] Error sending email: {e}")
+            log_email(to, subject_final, html, status='Failed', error=str(e))
+    except Exception as e:
+        print(f"[send_templated_email] Fatal error: {e}")
+        log_email(to, subject or template_name, '', status='Failed', error=str(e))
+
 class PatchedModelView(FlaskAdminModelView):
     def render(self, template, **kwargs):
         from models import SiteSettings
@@ -339,8 +412,8 @@ class TestimonialAdmin(SecureModelView):
             widget=Select2Widget()
         )
     )
-    form_columns = ['name', 'content', 'date', 'status']
-    column_searchable_list = ['name', 'content', 'status']
+    form_columns = ['name', 'email', 'content', 'date', 'status']
+    column_searchable_list = ['name', 'email', 'content', 'status']
     column_filters = ['status', 'date']
     can_view_details = True
     can_export = True
@@ -357,6 +430,10 @@ class TestimonialAdmin(SecureModelView):
             count = 0
             for t in query:
                 t.status = 'Approved'
+                # Send approval email if email exists
+                if t.email:
+                    context = {'testimonial': t}
+                    send_templated_email(t.email, 'testimonial_approved', context, subject='Your Testimonial is Approved')
                 count += 1
             self.session.commit()
             flash(f'{count} testimonials approved.', 'success')
@@ -372,6 +449,10 @@ class TestimonialAdmin(SecureModelView):
             count = 0
             for t in query:
                 t.status = 'Rejected'
+                # Send rejection email if email exists
+                if t.email:
+                    context = {'testimonial': t}
+                    send_templated_email(t.email, 'testimonial_rejected', context, subject='Your Testimonial was Rejected')
                 count += 1
             self.session.commit()
             flash(f'{count} testimonials rejected.', 'success')
@@ -385,6 +466,26 @@ class TestimonialAdmin(SecureModelView):
         actions['approve'] = (self.action_approve, 'approve', 'Approve')
         actions['reject'] = (self.action_reject, 'reject', 'Reject')
         return actions
+
+    def on_model_change(self, form, model, is_created):
+        from sqlalchemy import inspect
+        old_status = None
+        if not is_created:
+            state = inspect(model)
+            hist = state.attrs.status.history
+            if hist.has_changes():
+                old_status = hist.deleted[0] if hist.deleted else None
+            else:
+                old_status = getattr(model, 'status', None)
+        super().on_model_change(form, model, is_created)
+        print(f"[TestimonialAdmin] on_model_change: old.status={old_status}, new.status={model.status}, email={model.email}")
+        if not is_created and old_status != model.status and model.email:
+            context = {'name': model.name, 'email': model.email, 'content': model.content, 'date': model.date, 'status': model.status}
+            print(f"[TestimonialAdmin] Sending email for status change to {model.status} for {model.email}")
+            if model.status == 'Approved':
+                send_templated_email(model.email, 'testimonial_approved', context, subject='Your Testimonial is Approved')
+            elif model.status == 'Rejected':
+                send_templated_email(model.email, 'testimonial_rejected', context, subject='Your Testimonial was Rejected')
 
 class BookingAdmin(SecureModelView):
     form_overrides = dict(status=SelectField)
@@ -434,6 +535,33 @@ class BookingAdmin(SecureModelView):
             if not self.handle_view_exception(ex):
                 raise
             flash(f'Failed to cancel bookings. {str(ex)}', 'danger')
+
+    def on_model_change(self, form, model, is_created):
+        from sqlalchemy import inspect
+        old_status = None
+        if not is_created:
+            state = inspect(model)
+            hist = state.attrs.status.history
+            if hist.has_changes():
+                old_status = hist.deleted[0] if hist.deleted else None
+            else:
+                old_status = getattr(model, 'status', None)
+        super().on_model_change(form, model, is_created)
+        print(f"[BookingAdmin] on_model_change: old.status={old_status}, new.status={model.status}, email={model.email}")
+        if not is_created and old_status != model.status and model.email:
+            context = {
+                'name': model.name,
+                'email': model.email,
+                'package': model.package,
+                'message': model.message,
+                'date': model.date,
+                'status': model.status
+            }
+            print(f"[BookingAdmin] Sending email for status change to {model.status} for {model.email}")
+            if model.status == 'Confirmed':
+                send_templated_email(model.email, 'booking_confirmation', context, subject='Your Booking is Confirmed')
+            elif model.status == 'Cancelled':
+                send_templated_email(model.email, 'booking_rejected', context, subject='Your Booking was Cancelled')
 
     def get_actions(self):
         actions = super().get_actions()
@@ -618,7 +746,14 @@ class SupportTicketAdmin(SecureModelView):
         super().on_model_change(form, model, is_created)
         # Send email if status or response changes
         if not is_created and old and (old.status != model.status or old.response != model.response):
-            context = {'ticket': model}
+            context = {
+                'name': model.name,
+                'email': model.email,
+                'subject': model.subject,
+                'message': model.message,
+                'status': model.status,
+                'response': model.response
+            }
             send_templated_email(model.email, 'ticket_updated', context)
 
 class EmailSettingsAdmin(SecureModelView):
@@ -734,9 +869,9 @@ def export_testimonials():
     testimonials = Testimonial.query.order_by(Testimonial.id.desc()).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['ID', 'Name', 'Content', 'Date'])
+    writer.writerow(['ID', 'Name', 'Email', 'Content', 'Date'])
     for t in testimonials:
-        writer.writerow([t.id, t.name, t.content, t.date])
+        writer.writerow([t.id, t.name, t.email, t.content, t.date])
     output.seek(0)
     return send_file(io.BytesIO(output.getvalue().encode()), mimetype='text/csv', as_attachment=True, download_name='testimonials.csv')
 @app.route('/admin/export_users')
@@ -795,63 +930,6 @@ def internal_error(e):
     return render_template('500.html', site_settings=settings), 500
 
 migrate = Migrate(app, db)
-
-# --- Email Helper Functions ---
-def log_email(to, subject, body, status, error=None):
-    """Log email sending attempts to the EmailLog table."""
-    log = EmailLog(to=to, subject=subject, body=body, status=status, error=error or '')
-    db.session.add(log)
-    db.session.commit()
-
-def apply_email_settings():
-    """Apply the latest email settings from the database to Flask-Mail config."""
-    settings = EmailSettings.query.first()
-    if settings:
-        app.config['MAIL_SERVER'] = settings.smtp_server
-        app.config['MAIL_PORT'] = settings.smtp_port
-        app.config['MAIL_USE_TLS'] = settings.use_tls
-        app.config['MAIL_USE_SSL'] = settings.use_ssl
-        app.config['MAIL_USERNAME'] = settings.username
-        app.config['MAIL_PASSWORD'] = settings.password
-        app.config['MAIL_DEFAULT_SENDER'] = settings.default_sender
-        mail.init_app(app)
-
-
-def render_email_template(template_name, context):
-    """Render an email template from the EmailTemplate model or fallback to file."""
-    template = EmailTemplate.query.filter_by(name=template_name).first()
-    if template and template.html_content:
-        # Use subject and html_content from DB
-        subject = template.subject.format(**context) if template.subject else context.get('subject', '')
-        html = template.html_content
-        try:
-            html = html.format(**context)
-        except Exception:
-            pass  # If formatting fails, use raw html
-        return subject, html
-    else:
-        # Fallback to file-based template
-        subject = context.get('subject', '')
-        try:
-            html = render_template(f'emails/{template_name}.html', **context)
-        except Exception:
-            html = f"<p>{subject}</p>"
-        return subject, html
-
-def send_templated_email(to, template_name, context, subject=None):
-    template = EmailTemplate.query.filter_by(name=template_name).first()
-    if template:
-        html = render_template_string(template.html_content, **context)
-        subject = subject or template.subject
-    else:
-        # fallback: use a file in templates/emails/ or a default string
-        try:
-            html = render_template(f'emails/{template_name}.html', **context)
-        except Exception:
-            html = f"Dear user, your request has been processed."
-        subject = subject or "Notification from JKLG Travel"
-    msg = Message(subject, recipients=[to], html=html)
-    mail.send(msg)
 
 # --- Dark Mode Toggle (JS/CSS) ---
 # Add to base admin template (see below for template instructions)

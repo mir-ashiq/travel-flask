@@ -60,9 +60,15 @@ class GalleryImage(db.Model):
 class Testimonial(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), nullable=True)  # New field for user email
     content = db.Column(db.Text, nullable=False)
     date = db.Column(db.Date)
     status = db.Column(db.String(20), default='Pending')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.status is None:
+            self.status = 'Pending'
 
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
