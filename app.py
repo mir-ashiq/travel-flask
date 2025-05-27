@@ -809,16 +809,18 @@ class SiteSettingsAdmin(SecureModelView):
         'phone',
         'email',
         'address',
-        'facebook',
-        'instagram',
-        'twitter',
-        'linkedin',
-        'youtube',
-        'whatsapp',
-        'telegram',
+        'facebook', 'show_facebook',
+        'instagram', 'show_instagram',
+        'twitter', 'show_twitter',
+        'linkedin', 'show_linkedin',
+        'youtube', 'show_youtube',
+        'whatsapp', 'show_whatsapp',
+        'telegram', 'show_telegram',
         'meta_description',
         'about',
-        'google_analytics_id'
+        'google_analytics_id',
+        'hero_title',
+        'hero_subtitle'
     ]
     can_view_details = True
     can_edit = True

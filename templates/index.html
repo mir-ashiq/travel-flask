@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% block hero %}
 <div class="hero text-center d-flex flex-column justify-content-center align-items-center animate__animated animate__fadeInDown" style="min-height: 350px;">
-    <h1 class="display-2 fw-bold mb-3 animate__animated animate__fadeInLeft" style="letter-spacing:2px;">Discover Jammu, Kashmir, Ladakh & Gurez</h1>
-    <p class="lead fs-4 mb-4 animate__animated animate__fadeInRight">Unforgettable journeys, breathtaking landscapes, and curated experiences await you.</p>
+    <h1 class="display-2 fw-bold mb-3 animate__animated animate__fadeInLeft" style="letter-spacing:2px;">{{ site_settings.hero_title if site_settings and site_settings.hero_title else 'Discover Jammu, Kashmir, Ladakh & Gurez' }}</h1>
+    <p class="lead fs-4 mb-4 animate__animated animate__fadeInRight">{{ site_settings.hero_subtitle if site_settings and site_settings.hero_subtitle else 'Unforgettable journeys, breathtaking landscapes, and curated experiences await you.' }}</p>
     <a href="/book" class="btn btn-lg btn-warning shadow px-5 py-3 fs-5 animate__animated animate__pulse animate__infinite"><i class="fa fa-calendar-check me-2"></i>Book Your Adventure</a>
 </div>
 {% endblock %}

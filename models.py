@@ -100,6 +100,15 @@ class SiteSettings(db.Model):
     meta_description = db.Column(db.String(300))
     about = db.Column(db.Text)
     google_analytics_id = db.Column(db.String(32))
+    show_facebook = db.Column(db.Boolean, default=True)
+    show_instagram = db.Column(db.Boolean, default=True)
+    show_twitter = db.Column(db.Boolean, default=True)
+    show_linkedin = db.Column(db.Boolean, default=True)
+    show_youtube = db.Column(db.Boolean, default=True)
+    show_whatsapp = db.Column(db.Boolean, default=True)
+    show_telegram = db.Column(db.Boolean, default=True)
+    hero_title = db.Column(db.String(200), default='Discover Jammu, Kashmir, Ladakh & Gurez')
+    hero_subtitle = db.Column(db.String(300), default='Unforgettable journeys, breathtaking landscapes, and curated experiences await you.')
 
     def __str__(self):
         return self.site_name or f"SiteSettings #{self.id}"
