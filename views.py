@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
-from models import Place, TourPackage, GalleryImage, Testimonial, User, Booking, SiteSettings, EmailLog, Blog, ItineraryDay
+from models import FAQ, Place, TourPackage, GalleryImage, Testimonial, User, Booking, SiteSettings, EmailLog, Blog, ItineraryDay
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from extensions import db, mail, limiter, babel
@@ -196,11 +196,14 @@ def package_detail(package_id):
 @main.route('/dashboard')
 @login_required
 def dashboard():
-    from models import Booking, TourPackage, Place, Testimonial
+    from models import Booking, TourPackage, Place, Testimonial, FAQ, GalleryImage, SupportTicket
     total_bookings = Booking.query.count()
     total_packages = TourPackage.query.count()
     total_places = Place.query.count()
     total_testimonials = Testimonial.query.count()
+    total_faqs = FAQ.query.count()
+    total_gallery = GalleryImage.query.count()
+    total_tickets = SupportTicket.query.count()
     recent_bookings = Booking.query.order_by(Booking.date.desc()).limit(5).all()
     popular_packages = db.session.query(Booking.package, db.func.count(Booking.package).label('count')).group_by(Booking.package).order_by(db.func.count(Booking.package).desc()).limit(5).all()
     return render_template('dashboard.html',
@@ -209,6 +212,9 @@ def dashboard():
         total_places=total_places,
         total_testimonials=total_testimonials,
         recent_bookings=recent_bookings,
+        total_faqs=total_faqs,
+        total_gallery=total_gallery,
+        total_tickets=total_tickets,
         popular_packages=popular_packages)
 
 @main.route('/admin/analytics')

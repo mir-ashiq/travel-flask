@@ -48,7 +48,7 @@
   <div class="col-md-3 mb-3">
     <div class="card shadow border-0">
       <div class="card-body">
-        <h4 class="text-secondary">{{ total_gallery }}</h4>
+        <h4 class="text-danger">{{ total_gallery }}</h4>
         <p class="mb-0">Gallery</p>
         <a href="{{ url_for('admin_galleryimage.index_view') }}" class="btn btn-outline-secondary btn-sm mt-2">Manage</a>
       </div>
@@ -130,15 +130,7 @@
       </div>
     </div>
   </div>
-  <div class="col-md-3 mb-3">
-    <div class="card shadow border-0">
-      <div class="card-body">
-        <h4 class="text-info"><i class="fa fa-question-circle"></i></h4>
-        <p class="mb-0">FAQs</p>
-        <a href="{{ url_for('admin_faq.index_view') }}" class="btn btn-outline-info btn-sm mt-2">Manage</a>
-      </div>
-    </div>
-  </div>
+  
   <div class="col-md-3 mb-3">
     <div class="card shadow border-0">
       <div class="card-body">
