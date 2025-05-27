@@ -31,7 +31,7 @@
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center gap-2" href="/">
                 {% if site_settings and site_settings.logo %}
-                    <img src="{{ url_for('static', filename=site_settings.logo) }}" alt="Logo" style="height:36px; width:auto; border-radius:6px;">
+                    <img src="{{ url_for('static', filename='uploads/' ~ site_settings.logo) }}" alt="Logo" style="height:36px; width:auto; border-radius:6px;">
                 {% else %}
                     <i class="fa fa-mountain-sun fa-lg"></i>
                 {% endif %}
