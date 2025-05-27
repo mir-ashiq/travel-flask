@@ -737,19 +737,37 @@ class TourPackageAdmin(PatchedModelView):
 class SupportTicketAdmin(SecureModelView):
     can_view_details = True
     can_export = True
-    column_searchable_list = ['subject', 'status']  # removed 'user_email'
+    column_searchable_list = ['subject', 'status']
     column_filters = ['status', 'created_at']
     can_edit = True
     can_create = True
     can_delete = True
+    form_overrides = dict(status=SelectField)
+    form_args = dict(
+        status=dict(
+            choices=[('Open', 'Open'), ('In Progress', 'In Progress'), ('Closed', 'Closed')]
+        )
+    )
 
     def on_model_change(self, form, model, is_created):
-        old = None
+        from sqlalchemy import inspect
+        old_status = None
+        old_response = None
         if not is_created:
-            old = self.session.query(self.model).get(model.id)
+            state = inspect(model)
+            hist_status = state.attrs.status.history
+            hist_response = state.attrs.response.history
+            if hist_status.has_changes():
+                old_status = hist_status.deleted[0] if hist_status.deleted else None
+            else:
+                old_status = getattr(model, 'status', None)
+            if hist_response.has_changes():
+                old_response = hist_response.deleted[0] if hist_response.deleted else None
+            else:
+                old_response = getattr(model, 'response', None)
         super().on_model_change(form, model, is_created)
         # Send email if status or response changes
-        if not is_created and old and (old.status != model.status or old.response != model.response):
+        if not is_created and (old_status != model.status or old_response != model.response):
             context = {
                 'name': model.name,
                 'email': model.email,
