@@ -5,7 +5,7 @@ from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView as FlaskAdminModelView
 from wtforms.fields import PasswordField, SelectField
 from flask_admin.form import ImageUploadField, FileUploadField, Select2Widget
-from wtforms_sqlalchemy.fields import QuerySelectMultipleField
+# from wtforms_sqlalchemy.fields import QuerySelectMultipleField  # Not available in latest version
 from flask_wtf import CSRFProtect, FlaskForm
 from flask_mail import Mail, Message
 from flask import render_template_string
@@ -29,7 +29,8 @@ from werkzeug.utils import secure_filename
 # Initialize extensions
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'supersecretkey')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///travel_agency.db'
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'travel_agency.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'  # Use a beautiful Bootstrap swatch
 
@@ -66,7 +67,8 @@ from wtforms import TextAreaField
 from flask_admin.actions import action
 from flask_admin.babel import gettext
 from flask_admin.model.template import macro
-from flask import Markup, jsonify, abort
+from markupsafe import Markup
+from flask import jsonify, abort
 
 # --- Email Helper Functions ---
 def log_email(to, subject, body, status, error=None):

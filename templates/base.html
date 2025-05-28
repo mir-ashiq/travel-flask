@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{{ site_settings.site_name if site_settings and site_settings.site_name else 'Travel Agency - Jammu, Kashmir, Ladakh, Gurez' }}</title>
     <meta name="description" content="{{ meta_description or 'Book your dream trip to Jammu, Kashmir, Ladakh & Gurez with JKLG Travel. Explore destinations, packages, and more.' }}">
     <meta property="og:title" content="{{ meta_title or site_settings.site_name or 'JKLG Travel' }}">
@@ -24,6 +24,20 @@
         .card { box-shadow: 0 2px 12px rgba(0,0,0,0.07); border: none; }
         .footer { background: #222; color: #fff; padding: 24px 0; margin-top: 48px; }
         .footer a { color: #fff; text-decoration: underline; }
+
+        /* Responsive tweaks for mobile */
+        @media (max-width: 767.98px) {
+            .navbar-brand img { height: 28px !important; }
+            .hero, .hero-carousel { min-height: 180px !important; }
+            .display-2, .display-5 { font-size: 2rem !important; }
+            .section-title { font-size: 1.3rem !important; }
+            .card-img-top, .gallery-card img, .gallery-card video { height: 160px !important; }
+            .package-card, .gallery-card, .testimonial-card { border-radius: 0.7rem !important; }
+            .footer { font-size: 0.95rem; padding: 16px 0; }
+            .footer .row > div { margin-bottom: 12px; }
+            .btn, .btn-lg, .btn-primary, .btn-warning { font-size: 1rem !important; padding: 0.5rem 1.2rem !important; }
+            .carousel-control-prev-icon, .carousel-control-next-icon { width: 2rem; height: 2rem; }
+        }
     </style>
 </head>
 <body>
@@ -70,52 +84,65 @@
     </div>
     <footer class="footer text-center mt-5">
         <div class="container">
-            <div class="row mb-2">
-                <div class="col-md-4 mb-2 mb-md-0">
+            <div class="row mb-2 gy-3 text-center text-md-start">
+                <div class="col-12 col-md-4 mb-2 mb-md-0">
                     <h6 class="fw-bold">Contact Us</h6>
-                    <p class="mb-1"><i class="fa fa-phone"></i> {{ site_settings.phone if site_settings and site_settings.phone else '+91-12345-67890' }}</p>
-                    <p class="mb-1"><i class="fa fa-envelope"></i> {{ site_settings.email if site_settings and site_settings.email else 'info@jklgtravel.com' }}</p>
-                    <p class="mb-1"><i class="fa fa-map-marker-alt"></i> {{ site_settings.address if site_settings and site_settings.address else 'Jammu, Kashmir, Ladakh & Gurez' }}</p>
+                    <p class="mb-1 small"><i class="fa fa-phone"></i> {{ site_settings.phone if site_settings and site_settings.phone else '+91-12345-67890' }}</p>
+                    <p class="mb-1 small"><i class="fa fa-envelope"></i> {{ site_settings.email if site_settings and site_settings.email else 'info@jklgtravel.com' }}</p>
+                    <p class="mb-1 small"><i class="fa fa-map-marker-alt"></i> {{ site_settings.address if site_settings and site_settings.address else 'Jammu, Kashmir, Ladakh & Gurez' }}</p>
                 </div>
-                <div class="col-md-4 mb-2 mb-md-0">
+                <div class="col-12 col-md-4 mb-2 mb-md-0">
                     <h6 class="fw-bold">Follow</h6>
-                    {% if site_settings and site_settings.facebook and site_settings.show_facebook %}
-                        <a href="https://facebook.com/{{ site_settings.facebook }}" class="me-2 text-white"><i class="fab fa-facebook fa-lg"></i></a>
-                    {% endif %}
-                    {% if site_settings and site_settings.instagram and site_settings.show_instagram %}
-                        <a href="https://instagram.com/{{ site_settings.instagram }}" class="me-2 text-white"><i class="fab fa-instagram fa-lg"></i></a>
-                    {% endif %}
-                    {% if site_settings and site_settings.twitter and site_settings.show_twitter %}
-                        <a href="https://x.com/{{ site_settings.twitter }}" class="me-2 text-white"><i class="fab fa-twitter fa-lg"></i></a>
-                    {% endif %}
-                    {% if site_settings and site_settings.linkedin and site_settings.show_linkedin %}
-                        <a href="https://linkedin.com/in/{{ site_settings.linkedin }}" class="me-2 text-white"><i class="fab fa-linkedin fa-lg"></i></a>
-                    {% endif %}
-                    {% if site_settings and site_settings.youtube and site_settings.show_youtube %}
-                        <a href="https://youtube.com/{{ site_settings.youtube }}" class="me-2 text-white"><i class="fab fa-youtube fa-lg"></i></a>
-                    {% endif %}
-                    {% if site_settings and site_settings.whatsapp and site_settings.show_whatsapp %}
-                        <a href="https://wa.me/{{ site_settings.whatsapp }}" class="me-2 text-white"><i class="fab fa-whatsapp fa-lg"></i></a>
-                    {% endif %}
-                    {% if site_settings and site_settings.telegram and site_settings.show_telegram %}
-                        <a href="https://t.me/{{ site_settings.telegram }}" class="me-2 text-white"><i class="fab fa-telegram fa-lg"></i></a>
-                    {% endif %}
+                    <div class="d-flex flex-wrap justify-content-center justify-content-md-start gap-2">
+                        {% if site_settings and site_settings.facebook and site_settings.show_facebook %}
+                            <a href="https://facebook.com/{{ site_settings.facebook }}" class="text-white"><i class="fab fa-facebook fa-lg"></i></a>
+                        {% endif %}
+                        {% if site_settings and site_settings.instagram and site_settings.show_instagram %}
+                            <a href="https://instagram.com/{{ site_settings.instagram }}" class="text-white"><i class="fab fa-instagram fa-lg"></i></a>
+                        {% endif %}
+                        {% if site_settings and site_settings.twitter and site_settings.show_twitter %}
+                            <a href="https://x.com/{{ site_settings.twitter }}" class="text-white"><i class="fab fa-twitter fa-lg"></i></a>
+                        {% endif %}
+                        {% if site_settings and site_settings.linkedin and site_settings.show_linkedin %}
+                            <a href="https://linkedin.com/in/{{ site_settings.linkedin }}" class="text-white"><i class="fab fa-linkedin fa-lg"></i></a>
+                        {% endif %}
+                        {% if site_settings and site_settings.youtube and site_settings.show_youtube %}
+                            <a href="https://youtube.com/{{ site_settings.youtube }}" class="text-white"><i class="fab fa-youtube fa-lg"></i></a>
+                        {% endif %}
+                        {% if site_settings and site_settings.whatsapp and site_settings.show_whatsapp %}
+                            <a href="https://wa.me/{{ site_settings.whatsapp }}" class="text-white"><i class="fab fa-whatsapp fa-lg"></i></a>
+                        {% endif %}
+                        {% if site_settings and site_settings.telegram and site_settings.show_telegram %}
+                            <a href="https://t.me/{{ site_settings.telegram }}" class="text-white"><i class="fab fa-telegram fa-lg"></i></a>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-12 col-md-4">
                     <h6 class="fw-bold">Quick Links</h6>
-                    <a href="/" class="d-block text-white">Home</a>
-                    <a href="/packages" class="d-block text-white">Packages</a>
-                    <a href="/book" class="d-block text-white">Book Now</a>
-                    <a href="/faq" class="d-block text-white">FAQ</a>
-                    <a href="/contact" class="d-block text-white">Contact</a>
-                    <a href="/help" class="d-block text-white">Help Center</a>
+                    <div class="d-flex flex-wrap justify-content-center justify-content-md-start gap-2 gap-md-0 flex-column flex-md-column align-items-center align-items-md-start">
+                        <a href="/" class="d-block text-white small">Home</a>
+                        <a href="/packages" class="d-block text-white small">Packages</a>
+                        <a href="/book" class="d-block text-white small">Book Now</a>
+                        <a href="/faq" class="d-block text-white small">FAQ</a>
+                        <a href="/contact" class="d-block text-white small">Contact</a>
+                        <a href="/help" class="d-block text-white small">Help Center</a>
+                    </div>
                 </div>
             </div>
             <hr class="bg-light">
-            <p class="mb-1">&copy; {{ 2025 }} {{ site_settings.site_name if site_settings and site_settings.site_name else 'JKLG Travel Agency' }}. All rights reserved.</p>
+            <p class="mb-1 small">&copy; {{ 2025 }} {{ site_settings.site_name if site_settings and site_settings.site_name else 'JKLG Travel Agency' }}. All rights reserved.</p>
             <small>Made with <i class="fa fa-heart text-danger"></i> by <a href="https://github.com/mir-ashiq">Ashiq Hussain Mir</a></small>
         </div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        @media (max-width: 767.98px) {
+            .footer .row > div { text-align: center !important; margin-bottom: 18px; }
+            .footer h6 { font-size: 1.1rem; }
+            .footer .small, .footer p, .footer a { font-size: 0.97rem !important; }
+            .footer .d-flex.flex-wrap { justify-content: center !important; }
+            .footer .gap-2 { gap: 0.7rem !important; }
+        }
+    </style>
 </body>
 </html>
