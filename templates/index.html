@@ -3,14 +3,18 @@
 {% set slides = site_settings.hero_slides | safe | from_json if site_settings and site_settings.hero_slides else None %}
 <div class="hero-carousel position-relative" style="min-height: 350px;">
     {% if slides %}
-        <div id="heroCarousel" class="carousel slide" data-bs-ride="carousel">
+        <div id="heroCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="{{ (site_settings.hero_slide_interval or 5) * 1000 }}">
             <div class="carousel-inner">
                 {% for slide in slides %}
                 <div class="carousel-item {% if loop.first %}active{% endif %}" style="background: url('{{ url_for('static', filename='uploads/' ~ (slide.image or site_settings.hero_bg_image or 'hero_default.jpg')) }}') center/cover no-repeat; min-height: 350px;">
                     <div class="hero text-center d-flex flex-column justify-content-center align-items-center" style="min-height: 350px; background: rgba(0,0,0,0.3);">
                         <h1 class="display-2 fw-bold mb-3 animate__animated {{ slide.animation_title or 'animate__fadeInLeft' }}" style="letter-spacing:2px;">{{ slide.title }}</h1>
                         <p class="lead fs-4 mb-4 animate__animated {{ slide.animation_subtitle or 'animate__fadeInRight' }}">{{ slide.subtitle }}</p>
-                        <a href="/book" class="btn btn-lg btn-warning shadow px-5 py-3 fs-5 animate__animated animate__pulse animate__infinite"><i class="fa fa-calendar-check me-2"></i>Book Your Adventure</a>
+                        {% if slide.cta_text %}
+                        <a href="{{ slide.cta_link or '#' }}" class="btn btn-lg btn-warning shadow px-5 py-3 fs-5 animate__animated animate__pulse animate__infinite">
+                            <i class="fa fa-calendar-check me-2"></i>{{ slide.cta_text }}
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

@@ -836,6 +836,7 @@ class SiteSettingsAdmin(SecureModelView):
         'hero_title',
         'hero_subtitle',
         'hero_bg_image',
+        'hero_slide_interval',  # <-- add here
         'hero_slides',
     ]
     form_widget_args = {
@@ -857,24 +858,33 @@ class SiteSettingsAdmin(SecureModelView):
     }
 
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    @staticmethod
     def allowed_file(filename, ALLOWED_EXTENSIONS):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
     def on_model_change(self, form, model, is_created):
-        # Handle hero slides image uploads
+        # Handle hero slides image uploads and CTA/alt fields
+        import json
         slides_json = request.form.get('hero_slides')
         if slides_json:
             slides = json.loads(slides_json)
             for i, slide in enumerate(slides):
                 file_field = f'slide_image_{i}'
                 file = request.files.get(file_field)
-                if file and allowed_file(file.filename, self.ALLOWED_EXTENSIONS):
+                if file and self.allowed_file(file.filename, self.ALLOWED_EXTENSIONS):
                     filename = secure_filename(file.filename)
                     upload_path = os.path.join(current_app.root_path, 'static', 'uploads', filename)
                     file.save(upload_path)
                     slide['image'] = filename
+                # Ensure all fields exist for each slide
+                slide.setdefault('cta_text', '')
+                slide.setdefault('cta_link', '')
+                slide.setdefault('alt', '')
+                slide.setdefault('title', '')
+                slide.setdefault('subtitle', '')
+                slide.setdefault('animation_title', 'animate__fadeInLeft')
+                slide.setdefault('animation_subtitle', 'animate__fadeInRight')
             model.hero_slides = json.dumps(slides)
-        # ...existing code for other fields...
         return super().on_model_change(form, model, is_created)
 
 # Register admin views with advanced classes

@@ -111,6 +111,7 @@ class SiteSettings(db.Model):
     hero_subtitle = db.Column(db.String(300), default='Unforgettable journeys, breathtaking landscapes, and curated experiences await you.')
     hero_bg_image = db.Column(db.String(200), default='hero_default.jpg')  # New field for background image
     hero_slides = db.Column(db.Text)  # JSON: [{"title":..., "subtitle":..., "image":..., "animation_title":..., "animation_subtitle":...}, ...]
+    hero_slide_interval = db.Column(db.Integer, default=5)  # Interval in seconds for hero carousel
 
     def __str__(self):
         return self.site_name or f"SiteSettings #{self.id}"
@@ -138,8 +139,11 @@ class SiteSettings(db.Model):
                 slide.setdefault('title', '')
                 slide.setdefault('subtitle', '')
                 slide.setdefault('image', '')
+                slide.setdefault('alt', '')
                 slide.setdefault('animation_title', 'animate__fadeInLeft')
                 slide.setdefault('animation_subtitle', 'animate__fadeInRight')
+                slide.setdefault('cta_text', '')
+                slide.setdefault('cta_link', '')
             return slides
         except Exception:
             return []
