@@ -38,8 +38,8 @@ A modern, feature-rich Flask-based website for a travel agency covering Jammu, K
 
 ### 1. Clone the repository
 ```powershell
-git clone <your-repo-url>
-cd travel
+git clone https://github.com/mir-ashiq/travel-flask
+cd travel-flask
 ```
 
 ### 2. Create a virtual environment
