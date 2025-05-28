@@ -19,6 +19,15 @@ A modern, feature-rich Flask-based website for a travel agency covering Jammu, K
 - Analytics dashboard for admins
 - Import/export data (CSV, PDF)
 - Multi-language support (Flask-Babel)
+- **Bulk import/export for users and packages (CSV)**
+- **PDF export for bookings and packages**
+- **Admin quick actions (approve/reject/confirm/cancel) for bookings, testimonials, and packages**
+- **User impersonation by admin**
+- **Real-time admin notifications**
+- **Dark mode toggle for admin panel**
+- **Inline editing and tooltips in admin**
+- **Advanced analytics widgets (bookings by region, revenue, ticket status)**
+- **Custom Jinja filter: `from_json` for template JSON parsing**
 
 ---
 
@@ -31,6 +40,12 @@ A modern, feature-rich Flask-based website for a travel agency covering Jammu, K
 - Flask-Login
 - Flask-Babel (i18n)
 - Bootstrap 5
+- Flask-Limiter (rate limiting)
+- Flask-CKEditor (rich text editing)
+- Flask-WTF (forms & CSRF)
+- Flask-Migrate (database migrations)
+- WTForms/WTForms-Alchemy
+- xhtml2pdf (PDF export)
 
 ---
 
@@ -96,13 +111,19 @@ flask run
   - **Places & Packages:** Add/edit/delete destinations and tour packages.
   - **Bookings:** View, confirm, or reject bookings. Status changes trigger email notifications.
   - **Testimonials:** Approve or reject testimonials before they appear on the site.
-  - **Gallery:** Upload and manage images.
-  - **Users:** Manage user accounts and permissions.
-  - **Site Settings:** Update site name, contact info, branding, and social links.
+  - **Gallery:** Upload and manage images and videos (with validation).
+  - **Users:** Manage user accounts and permissions. Reset passwords and impersonate users.
+  - **Site Settings:** Update site name, contact info, branding, hero slides, and social links.
   - **Email Templates:** Edit email content for all notifications.
   - **Support Tickets:** Respond to user queries and update ticket status.
-  - **Import/Export:** Download bookings/packages as CSV or PDF. Import users/packages from CSV.
+  - **Import/Export:** Download bookings/packages/testimonials/users as CSV or PDF. Import users/packages from CSV.
 - **Logs:** View email logs and activity logs for auditing.
+- **Quick Actions:** Approve/reject/confirm/cancel directly from the list view with one click.
+- **Inline Editing:** Edit key fields directly in the list view.
+- **Details Modal:** View record details in a modal popup.
+- **Dark Mode:** Toggle dark mode in the admin panel.
+- **Notifications:** See real-time counts of new bookings and tickets.
+- **Analytics:** View bookings by region, revenue, and ticket status charts.
 
 ---
 
@@ -116,11 +137,47 @@ flask run
 
 ---
 
+## Advanced Admin Features
+
+### Quick Actions & Inline Editing
+- Approve/reject testimonials, confirm/cancel bookings, publish/unpublish/duplicate packages with one click.
+- Edit fields inline in the admin list view for faster management.
+
+### Import/Export & PDF
+- Export bookings, testimonials, users, and packages as CSV or PDF from the admin panel.
+- Import users and packages in bulk from CSV files.
+
+### User Impersonation
+- Admins can impersonate any user for troubleshooting or support.
+
+### Notifications
+- Real-time polling for new bookings and support tickets in the admin panel.
+
+### Dashboard Analytics
+- Visual widgets for bookings by region, revenue, and ticket status.
+
+### File Validation
+- Images and videos are validated for type and size on upload (20MB for images, 150MB for videos).
+
+### Custom Jinja Filter
+- `from_json`: Use `{{ value|from_json }}` in templates to parse JSON strings (see `app.py`).
+
+### Error Handling
+- Custom 404 and 500 error pages with site branding.
+
+---
+
 ## Customization
 - **Site Branding:** Update site name, logo, contact info, and social links in the admin Site Settings.
+- **Hero Slides:** Manage homepage hero slides (images, text, animations) in Site Settings.
 - **Email Templates:** Edit email content in the admin panel or directly in `templates/emails/`.
 - **Add Content:** Use the admin panel to add new destinations, packages, gallery images, and more.
 - **Languages:** Add new translations using Flask-Babel if needed.
+- **Admin Templates:**
+  - `admin/list_with_actions.html`: Quick actions, details modal, inline editing
+  - `admin/import_users.html`, `admin/import_packages.html`: Bulk import forms
+  - `admin/bookings_pdf.html`, `admin/packages_pdf.html`: PDF export
+  - `admin/base.html`: Dark mode toggle, notifications
 
 ---
 
@@ -159,6 +216,12 @@ flask run
 
 **Q: How do I translate the site?**
 - Add new language files using Flask-Babel and update the templates as needed.
+
+**Q: How do I impersonate a user?**
+- Use the "Impersonate" link in the admin panel next to a user account.
+
+**Q: How do I use the dark mode toggle?**
+- Click the dark mode button in the admin panel header.
 
 ---
 
