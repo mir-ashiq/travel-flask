@@ -1,0 +1,169 @@
+{% extends 'admin/base.html' %}
+
+{% block body %}
+    {{ super() }}
+    <form method="POST" enctype="multipart/form-data">
+        {# Always render CSRF token as a hidden input #}
+        <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
+        {% for field in form if field.name not in ['hero_slides', 'csrf_token'] %}
+            <div class="mb-3">
+                {{ field.label(class_="form-label fw-bold") }}
+                {% if field.name.startswith('show_') %}
+                    <div class="form-check form-switch" style="width: 120px;">
+                        {{ field(class_="form-check-input", style="width: 2.5em; height: 1.5em;") }}
+                        <label class="form-check-label ms-2">Enable</label>
+                    </div>
+                {% elif field.type in ['FileField', 'ImageUploadField'] %}
+                    {{ field() }}
+                {% else %}
+                    {{ field(class_="form-control") }}
+                {% endif %}
+                {% if field.description %}
+                    <div class="form-text">{{ field.description }}</div>
+                {% endif %}
+                {% for error in field.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+        <hr>
+        <h4>Hero Slides Editor</h4>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Hero Slides</label>
+            <div id="slides-container"></div>
+            <button type="button" class="btn btn-primary mt-2" id="add-slide-btn"><i class="fa fa-plus"></i> Add Slide</button>
+            <textarea id="hero_slides" name="hero_slides" class="form-control d-none">{{ form.hero_slides.data }}</textarea>
+            {% for error in form.hero_slides.errors %}
+                <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+            <div class="form-text">Add, edit, or remove slides visually. Each slide can have a title, subtitle, image (upload or filename), and advanced animation classes. Drag to reorder slides.</div>
+        </div>
+        <button type="submit" class="btn btn-success">Save</button>
+        <a href="{{ return_url }}" class="btn btn-secondary">Cancel</a>
+    </form>
+    <style>
+    .slide-row { cursor: grab; }
+    .slide-row.dragging { opacity: 0.5; }
+    .slide-thumb { max-width: 60px; max-height: 40px; object-fit: cover; border-radius: 4px; }
+    </style>
+    <script>
+    // Advanced Hero Slides Editor
+    const ANIMATIONS = [
+        'animate__fadeInLeft', 'animate__fadeInRight', 'animate__fadeInUp', 'animate__fadeInDown',
+        'animate__zoomIn', 'animate__zoomInLeft', 'animate__zoomInRight', 'animate__bounceIn',
+        'animate__flipInX', 'animate__flipInY', 'animate__slideInLeft', 'animate__slideInRight',
+        'animate__lightSpeedInLeft', 'animate__lightSpeedInRight', 'animate__fadeIn', 'animate__fadeInTopLeft',
+        'animate__fadeInTopRight', 'animate__fadeInBottomLeft', 'animate__fadeInBottomRight',
+    ];
+    function updateSlidesField() {
+        const slides = [];
+        document.querySelectorAll('.slide-row').forEach(function(row) {
+            slides.push({
+                title: row.querySelector('.slide-title').value,
+                subtitle: row.querySelector('.slide-subtitle').value,
+                image: row.querySelector('.slide-image').value,
+                animation_title: row.querySelector('.slide-animation-title').value,
+                animation_subtitle: row.querySelector('.slide-animation-subtitle').value
+            });
+        });
+        document.getElementById('hero_slides').value = JSON.stringify(slides, null, 2);
+    }
+    function createAnimationSelect(className, value) {
+        const select = document.createElement('select');
+        select.className = 'form-select ' + className;
+        ANIMATIONS.forEach(anim => {
+            const opt = document.createElement('option');
+            opt.value = anim;
+            opt.textContent = anim.replace('animate__', '').replace(/([A-Z])/g, ' $1');
+            if (anim === value) opt.selected = true;
+            select.appendChild(opt);
+        });
+        return select;
+    }
+    function addSlideRow(slide={}, index) {
+        const container = document.getElementById('slides-container');
+        const row = document.createElement('div');
+        row.className = 'slide-row mb-3 p-2 border rounded bg-light d-flex align-items-center';
+        row.draggable = true;
+        row.innerHTML = `
+            <div class="row g-2 align-items-end flex-grow-1">
+                <div class="col-md-2"><input type="text" class="form-control slide-title" placeholder="Title" value="${slide.title||''}"></div>
+                <div class="col-md-3"><input type="text" class="form-control slide-subtitle" placeholder="Subtitle" value="${slide.subtitle||''}"></div>
+                <div class="col-md-2">
+                    <input type="text" class="form-control slide-image" placeholder="Image filename or URL" value="${slide.image||''}">
+                    <input type="file" name="slide_image_${index}" class="form-control slide-upload mt-1" accept="image/*">
+                    <img src="${slide.image ? '/static/uploads/' + slide.image : ''}" class="slide-thumb mt-1" style="display:${slide.image ? 'block':'none'};" onerror="this.style.display='none'">
+                </div>
+                <div class="col-md-2 anim-title"></div>
+                <div class="col-md-2 anim-subtitle"></div>
+                <div class="col-md-1"><button type="button" class="btn btn-danger btn-sm slide-delete"><i class="fa fa-trash"></i></button></div>
+            </div>
+        `;
+        // Animation selects
+        row.querySelector('.anim-title').appendChild(createAnimationSelect('slide-animation-title', slide.animation_title||'animate__fadeInLeft'));
+        row.querySelector('.anim-subtitle').appendChild(createAnimationSelect('slide-animation-subtitle', slide.animation_subtitle||'animate__fadeInRight'));
+        // Delete
+        row.querySelector('.slide-delete').onclick = function() {
+            row.remove();
+            updateSlidesField();
+        };
+        // Inputs
+        row.querySelectorAll('input,select').forEach(input => input.addEventListener('input', updateSlidesField));
+        // Upload
+        row.querySelector('.slide-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                // Show preview
+                const img = row.querySelector('.slide-thumb');
+                img.src = ev.target.result;
+                img.style.display = 'block';
+                // Set filename (simulate upload, real upload should be handled on form submit)
+                row.querySelector('.slide-image').value = file.name;
+                updateSlidesField();
+            };
+            reader.readAsDataURL(file);
+        });
+        // Drag & drop
+        row.addEventListener('dragstart', function(e) {
+            row.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', Array.from(container.children).indexOf(row));
+        });
+        row.addEventListener('dragend', function() {
+            row.classList.remove('dragging');
+            updateSlidesField();
+        });
+        row.addEventListener('dragover', function(e) { e.preventDefault(); });
+        row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            const from = +e.dataTransfer.getData('text/plain');
+            const to = Array.from(container.children).indexOf(row);
+            if (from !== to) {
+                const moving = container.children[from];
+                if (from < to) {
+                    container.insertBefore(moving, row.nextSibling);
+                } else {
+                    container.insertBefore(moving, row);
+                }
+                updateSlidesField();
+            }
+        });
+        container.appendChild(row);
+        updateSlidesField();
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        const slides = (() => {
+            try { return JSON.parse(document.getElementById('hero_slides').value); } catch { return []; }
+        })();
+        slides.forEach((slide, i) => addSlideRow(slide, i));
+        let slideCount = slides.length;
+        document.getElementById('add-slide-btn').onclick = function(e) {
+            e.preventDefault();
+            addSlideRow({}, slideCount++);
+        };
+    });
+    </script>
+{% endblock %}
+{% block tail %}{{ super() }}{% endblock %}

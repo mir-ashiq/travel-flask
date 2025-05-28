@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_file, request, flash
+from flask import Flask, render_template, send_file, request, flash, current_app
 from extensions import db, mail, babel, limiter
 from flask_login import LoginManager
 from flask_admin import Admin
@@ -6,7 +6,7 @@ from flask_admin.contrib.sqla import ModelView as FlaskAdminModelView
 from wtforms.fields import PasswordField, SelectField
 from flask_admin.form import ImageUploadField, FileUploadField, Select2Widget
 from wtforms_sqlalchemy.fields import QuerySelectMultipleField
-from flask_wtf import CSRFProtect
+from flask_wtf import CSRFProtect, FlaskForm
 from flask_mail import Mail, Message
 from flask import render_template_string
 from models import EmailTemplate
@@ -22,6 +22,9 @@ except ImportError:
     # Video validation will be basic if python-magic is not installed
 
 from flask_ckeditor import CKEditor, CKEditorField
+from wtforms import Form, StringField
+import json
+from werkzeug.utils import secure_filename
 
 # Initialize extensions
 app = Flask(__name__)
@@ -322,7 +325,7 @@ class UniqueImageUploadField(ImageUploadField):
                 size = self.data.stream.tell()
                 self.data.stream.seek(0)
                 if size > MAX_IMAGE_SIZE:
-                    raise ValueError('Image file too large (max 2MB).')
+                    raise ValueError('Image file too large (max 20MB).')
                 if not validate_image(self.data.stream):
                     raise ValueError('Invalid image file.')
         super().pre_validate(form)
@@ -337,7 +340,7 @@ class UniqueVideoUploadField(FileUploadField):
                 size = self.data.stream.tell()
                 self.data.stream.seek(0)
                 if size > MAX_VIDEO_SIZE:
-                    raise ValueError('Video file too large (max 50MB).')
+                    raise ValueError('Video file too large (max 150MB).')
                 if not validate_video(self.data.stream):
                     raise ValueError('Invalid video file.')
         super().pre_validate(form)
@@ -797,11 +800,22 @@ class ActivityLogAdmin(SecureModelView):
     can_create = False
     can_delete = True
 
+class HeroSlideForm(Form):
+    title = StringField('Slide Title')
+    subtitle = StringField('Slide Subtitle')
+    image = StringField('Image Filename')
+    animation_title = StringField('Title Animation Class')
+    animation_subtitle = StringField('Subtitle Animation Class')
+
 class SiteSettingsAdmin(SecureModelView):
+    form_base_class = FlaskForm
     form_extra_fields = {
-        'logo': ImageUploadField('Logo', base_path=os.path.join(os.path.dirname(__file__), 'static', 'uploads'), allow_overwrite=True)
+        'logo': ImageUploadField('Logo', base_path=os.path.join(os.path.dirname(__file__), 'static', 'uploads'), allow_overwrite=True),
+        'hero_bg_image': ImageUploadField('Hero Background Image', base_path=os.path.join(os.path.dirname(__file__), 'static', 'uploads'), allow_overwrite=True),
     }
-    # Specify the order: id, site_name, site_title, logo, then the rest
+    form_overrides = {
+        'hero_slides': TextAreaField  # We'll use a custom widget below
+    }
     form_columns = [
         'site_name',
         'site_title',
@@ -820,12 +834,18 @@ class SiteSettingsAdmin(SecureModelView):
         'about',
         'google_analytics_id',
         'hero_title',
-        'hero_subtitle'
+        'hero_subtitle',
+        'hero_bg_image',
+        'hero_slides',
     ]
-    can_view_details = True
-    can_edit = True
-    can_create = True
-    can_delete = True
+    form_widget_args = {
+        'hero_slides': {
+            'rows': 6,
+            'placeholder': 'Use the Slide Editor below for a user-friendly interface.'
+        }
+    }
+    create_template = 'admin/model/edit_hero_slides.html'
+    edit_template = 'admin/model/edit_hero_slides.html'
 
     # Optional: Show image preview for logo in the form
     def _logo_preview(view, context, model, name):
@@ -835,6 +855,27 @@ class SiteSettingsAdmin(SecureModelView):
     column_formatters = {
         'logo': _logo_preview
     }
+
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    def allowed_file(filename, ALLOWED_EXTENSIONS):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+    def on_model_change(self, form, model, is_created):
+        # Handle hero slides image uploads
+        slides_json = request.form.get('hero_slides')
+        if slides_json:
+            slides = json.loads(slides_json)
+            for i, slide in enumerate(slides):
+                file_field = f'slide_image_{i}'
+                file = request.files.get(file_field)
+                if file and allowed_file(file.filename, self.ALLOWED_EXTENSIONS):
+                    filename = secure_filename(file.filename)
+                    upload_path = os.path.join(current_app.root_path, 'static', 'uploads', filename)
+                    file.save(upload_path)
+                    slide['image'] = filename
+            model.hero_slides = json.dumps(slides)
+        # ...existing code for other fields...
+        return super().on_model_change(form, model, is_created)
 
 # Register admin views with advanced classes
 admin.add_view(PlaceAdmin(Place, db.session, name='Places', endpoint='admin_place'))
@@ -1089,3 +1130,10 @@ admin.add_link(MenuLink(name='Bulk Import Packages', category='', url='/admin/im
 # - base.html or admin/base.html: for dark mode toggle, notifications
 #
 # See README or comments for further UI/UX polish and advanced analytics.
+
+@app.template_filter('from_json')
+def from_json_filter(s):
+    try:
+        return json.loads(s)
+    except Exception:
+        return None

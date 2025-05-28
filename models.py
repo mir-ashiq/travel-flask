@@ -109,9 +109,40 @@ class SiteSettings(db.Model):
     show_telegram = db.Column(db.Boolean, default=True)
     hero_title = db.Column(db.String(200), default='Discover Jammu, Kashmir, Ladakh & Gurez')
     hero_subtitle = db.Column(db.String(300), default='Unforgettable journeys, breathtaking landscapes, and curated experiences await you.')
+    hero_bg_image = db.Column(db.String(200), default='hero_default.jpg')  # New field for background image
+    hero_slides = db.Column(db.Text)  # JSON: [{"title":..., "subtitle":..., "image":..., "animation_title":..., "animation_subtitle":...}, ...]
 
     def __str__(self):
         return self.site_name or f"SiteSettings #{self.id}"
+
+    # Helper for admin: pretty print slides
+    def hero_slides_pretty(self):
+        import json
+        try:
+            slides = json.loads(self.hero_slides) if self.hero_slides else []
+            return '\n'.join([
+                f"{i+1}. {slide.get('title','')} | {slide.get('subtitle','')} | {slide.get('image','')} | {slide.get('animation_title','')} | {slide.get('animation_subtitle','')}"
+                for i, slide in enumerate(slides)
+            ])
+        except Exception:
+            return self.hero_slides or ''
+
+    @property
+    def hero_slides_list(self):
+        import json
+        try:
+            slides = json.loads(self.hero_slides) if self.hero_slides else []
+            # Ensure all keys exist for each slide and add robust defaults
+            for slide in slides:
+                slide.setdefault('enabled', True)
+                slide.setdefault('title', '')
+                slide.setdefault('subtitle', '')
+                slide.setdefault('image', '')
+                slide.setdefault('animation_title', 'animate__fadeInLeft')
+                slide.setdefault('animation_subtitle', 'animate__fadeInRight')
+            return slides
+        except Exception:
+            return []
 
 class EmailSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)

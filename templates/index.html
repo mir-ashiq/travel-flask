@@ -1,9 +1,36 @@
 {% extends 'base.html' %}
 {% block hero %}
-<div class="hero text-center d-flex flex-column justify-content-center align-items-center animate__animated animate__fadeInDown" style="min-height: 350px;">
-    <h1 class="display-2 fw-bold mb-3 animate__animated animate__fadeInLeft" style="letter-spacing:2px;">{{ site_settings.hero_title if site_settings and site_settings.hero_title else 'Discover Jammu, Kashmir, Ladakh & Gurez' }}</h1>
-    <p class="lead fs-4 mb-4 animate__animated animate__fadeInRight">{{ site_settings.hero_subtitle if site_settings and site_settings.hero_subtitle else 'Unforgettable journeys, breathtaking landscapes, and curated experiences await you.' }}</p>
-    <a href="/book" class="btn btn-lg btn-warning shadow px-5 py-3 fs-5 animate__animated animate__pulse animate__infinite"><i class="fa fa-calendar-check me-2"></i>Book Your Adventure</a>
+{% set slides = site_settings.hero_slides | safe | from_json if site_settings and site_settings.hero_slides else None %}
+<div class="hero-carousel position-relative" style="min-height: 350px;">
+    {% if slides %}
+        <div id="heroCarousel" class="carousel slide" data-bs-ride="carousel">
+            <div class="carousel-inner">
+                {% for slide in slides %}
+                <div class="carousel-item {% if loop.first %}active{% endif %}" style="background: url('{{ url_for('static', filename='uploads/' ~ (slide.image or site_settings.hero_bg_image or 'hero_default.jpg')) }}') center/cover no-repeat; min-height: 350px;">
+                    <div class="hero text-center d-flex flex-column justify-content-center align-items-center" style="min-height: 350px; background: rgba(0,0,0,0.3);">
+                        <h1 class="display-2 fw-bold mb-3 animate__animated {{ slide.animation_title or 'animate__fadeInLeft' }}" style="letter-spacing:2px;">{{ slide.title }}</h1>
+                        <p class="lead fs-4 mb-4 animate__animated {{ slide.animation_subtitle or 'animate__fadeInRight' }}">{{ slide.subtitle }}</p>
+                        <a href="/book" class="btn btn-lg btn-warning shadow px-5 py-3 fs-5 animate__animated animate__pulse animate__infinite"><i class="fa fa-calendar-check me-2"></i>Book Your Adventure</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Previous</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Next</span>
+            </button>
+        </div>
+    {% else %}
+        <div class="hero text-center d-flex flex-column justify-content-center align-items-center animate__animated animate__fadeInDown" style="min-height: 350px; background: url('{{ url_for('static', filename='uploads/' ~ (site_settings.hero_bg_image or 'hero_default.jpg')) }}') center/cover no-repeat; background-size: cover;">
+            <h1 class="display-2 fw-bold mb-3 animate__animated animate__fadeInLeft" style="letter-spacing:2px;">{{ site_settings.hero_title if site_settings and site_settings.hero_title else 'Discover Jammu, Kashmir, Ladakh & Gurez' }}</h1>
+            <p class="lead fs-4 mb-4 animate__animated animate__fadeInRight">{{ site_settings.hero_subtitle if site_settings and site_settings.hero_subtitle else 'Unforgettable journeys, breathtaking landscapes, and curated experiences await you.' }}</p>
+            <a href="/book" class="btn btn-lg btn-warning shadow px-5 py-3 fs-5 animate__animated animate__pulse animate__infinite"><i class="fa fa-calendar-check me-2"></i>Book Your Adventure</a>
+        </div>
+    {% endif %}
 </div>
 {% endblock %}
 {% block content %}

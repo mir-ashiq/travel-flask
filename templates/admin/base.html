@@ -15,26 +15,7 @@
 </div>
 <hr>
 {% block body %}{% endblock %}
-<script>
-// Dark mode toggle
-const toggleBtn = document.getElementById('darkModeToggle');
-toggleBtn.addEventListener('click', function() {
-  document.body.classList.toggle('bg-dark');
-  document.body.classList.toggle('text-light');
-  localStorage.setItem('adminDarkMode', document.body.classList.contains('bg-dark'));
-});
-// Restore dark mode
-if(localStorage.getItem('adminDarkMode') === 'true') {
-  document.body.classList.add('bg-dark','text-light');
-}
-// Tooltips
-var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-  return new bootstrap.Tooltip(tooltipTriggerEl);
-});
-// Dummy notifications (replace with AJAX in production)
-document.getElementById('adminNotifications').onclick = function() {
-  alert('No new notifications.');
-};
-</script>
 {% endblock %}
+{% block tail %}{% endblock %}
+</body>
+</html>

@@ -53,7 +53,9 @@ def init_site_settings():
                 about='JKLG Travel is your trusted partner for exploring the beauty of Jammu, Kashmir, Ladakh, and Gurez. We offer curated packages, expert guides, and unforgettable experiences.',
                 google_analytics_id='',
                 hero_title='Discover Jammu, Kashmir, Ladakh & Gurez',
-                hero_subtitle='Unforgettable journeys, breathtaking landscapes, and curated experiences await you.'
+                hero_subtitle='Unforgettable journeys, breathtaking landscapes, and curated experiences await you.',
+                hero_bg_image='hero_default.jpg',
+                hero_slides=None
             )
             for key, value in defaults.items():
                 if not hasattr(settings, key) or getattr(settings, key) is None:
