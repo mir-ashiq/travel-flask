@@ -36,6 +36,7 @@
         </div>
     {% endif %}
 </div>
+<img src="{{ url_for('static', filename='uploads/brush.png') }}" alt="Brush Stroke" class="hero-brush">
 {% endblock %}
 {% block content %}
 <!-- Popular Packages -->
@@ -77,6 +78,10 @@
 </div>
 
 <!-- Counter Section -->
+<h2 class="section-title text-center text-primary display-5 mb-4 animate__animated animate__fadeInUp">
+    <i class="fa fa-chart-line me-2"></i>Our Achievements in Numbers
+</h2>
+<p class="text-center text-muted mb-4">We are proud to have served thousands of travelers, curated unique experiences, and built a reputation for excellence. Here are some highlights of our journey so far.</p>
 <div class="container mb-5">
   <div class="row justify-content-center text-center g-4">
     <div class="col-6 col-md-3">
@@ -145,7 +150,10 @@ counters.forEach(counter => {
 }
 </style>
 <!-- Gallery Carousel -->
-<h2 class="section-title text-center text-success display-5 mb-4 animate__animated animate__fadeInUp"><i class="fa fa-images me-2"></i>Gallery</h2>
+<h2 class="section-title text-center text-success display-5 mb-4 animate__animated animate__fadeInUp">
+    <i class="fa fa-images me-2"></i>Gallery
+</h2>
+<p class="text-center text-muted mb-3">A glimpse into the breathtaking beauty and unforgettable moments captured by our travelers. Explore our curated gallery of destinations, adventures, and memories from Jammu, Kashmir, Ladakh & Gurez.</p>
 <div id="galleryCarousel" class="carousel slide mb-3" data-bs-ride="carousel">
   <div class="carousel-inner">
     {% for g in gallery %}
@@ -186,7 +194,10 @@ counters.forEach(counter => {
 </div>
 
 <!-- Testimonials Carousel -->
-<h2 class="section-title text-center text-danger display-5 mb-4 animate__animated animate__fadeInUp"><i class="fa fa-quote-left me-2"></i>What Our Travelers Say</h2>
+<h2 class="section-title text-center text-danger display-5 mb-4 animate__animated animate__fadeInUp">
+    <i class="fa fa-quote-left me-2"></i>What Our Travelers Say
+</h2>
+<p class="text-center text-muted mb-3">Hear from our happy travelers! Read real stories and testimonials from guests who explored the wonders of North India with JKLG Travel.</p>
 <div id="testimonialCarousel" class="carousel slide mb-5" data-bs-ride="carousel">
   <div class="carousel-inner">
     {% for t in testimonials %}
