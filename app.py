@@ -12,7 +12,7 @@ from flask import render_template_string
 from models import EmailTemplate
 import os
 from flask_admin.menu import MenuLink
-import imghdr
+#import imghdr
 from datetime import datetime, timedelta
 try:
     import magic  # python-magic for MIME type checking (add to requirements.txt)
@@ -25,6 +25,7 @@ from flask_ckeditor import CKEditor, CKEditorField
 from wtforms import Form, StringField
 import json
 from werkzeug.utils import secure_filename
+from PIL import Image
 
 # Initialize extensions
 app = Flask(__name__)
@@ -301,7 +302,14 @@ def allowed_file(filename, allowed_exts):
 def validate_image(stream):
     header = stream.read(512)
     stream.seek(0)
-    format = imghdr.what(None, header)
+    try:
+        img = Image.open(stream)
+        #format = imghdr.what(None, header)
+        format = img.format.lower()
+        stream.seek(0)
+    except:
+        format = None
+
     if not format:
         return False
     if format.lower() not in ALLOWED_IMAGE_EXTENSIONS:
