@@ -1157,3 +1157,8 @@ def from_json_filter(s):
         return json.loads(s)
     except Exception:
         return None
+
+# Make current year available in all templates
+@app.context_processor
+def inject_now():
+    return {'now': datetime.now()}

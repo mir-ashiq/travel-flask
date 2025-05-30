@@ -1,6 +1,84 @@
 {% extends 'base.html' %}
 {% block hero %}
 {% set slides = site_settings.hero_slides | safe | from_json if site_settings and site_settings.hero_slides else None %}
+<!-- <style>
+.hero-carousel, .carousel-item, .hero, .carousel-inner {
+    min-height: 500px !important;
+    height: 500px !important;
+    position: relative;
+}
+.hero-carousel {
+    background-size: cover !important;
+    background-position: center !important;
+    height: 500px !important;
+    min-height: 500px !important;
+}
+.carousel-item {
+    background-size: cover !important;
+    background-position: center !important;
+    /* height: 500px !important;
+    min-height: 500px !important; */
+}
+.hero-carousel .hero {
+    min-height: 500px !important;
+    height: 500px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+@media (max-width: 767.98px) {
+    .hero-carousel, .carousel-item, .hero, .carousel-inner {
+        min-height: 180px !important;
+        height: 180px !important;
+    }
+    .hero-carousel .carousel-item, .hero-carousel .hero {
+        min-height: 180px !important;
+        height: 180px !important;
+    }
+}
+/* Remove extra margin below gallery and testimonial carousels */
+#galleryCarousel, #testimonialCarousel {
+    margin-bottom: 0 !important;
+}
+</style> -->
+<style>
+.hero-carousel, .hero-carousel .carousel-item, .hero, .hero-carousel .carousel-inner {
+    min-height: 500px !important;
+    height: 500px !important;
+    position: relative;
+}
+.hero-carousel {
+    background-size: cover !important;
+    background-position: center !important;
+    height: 500px !important;
+    min-height: 500px !important;
+}
+.hero-carousel .carousel-item {
+    background-size: cover !important;
+    background-position: center !important;
+}
+.hero-carousel .hero {
+    min-height: 500px !important;
+    height: 500px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+@media (max-width: 767.98px) {
+    .hero-carousel, .hero-carousel .carousel-item, .hero, .hero-carousel .carousel-inner {
+        min-height: 180px !important;
+        height: 180px !important;
+    }
+    .hero-carousel .carousel-item, .hero-carousel .hero {
+        min-height: 180px !important;
+        height: 180px !important;
+    }
+}
+/* Remove extra margin below gallery and testimonial carousels */
+#galleryCarousel, #testimonialCarousel {
+    margin-bottom: 5 !important;
+}
+</style>
 <div class="hero-carousel position-relative" style="min-height: 350px;">
     {% if slides %}
         <div id="heroCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="{{ (site_settings.hero_slide_interval or 5) * 1000 }}">
@@ -154,7 +232,7 @@ counters.forEach(counter => {
     <i class="fa fa-images me-2"></i>Gallery
 </h2>
 <p class="text-center text-muted mb-3">A glimpse into the breathtaking beauty and unforgettable moments captured by our travelers. Explore our curated gallery of destinations, adventures, and memories from Jammu, Kashmir, Ladakh & Gurez.</p>
-<div id="galleryCarousel" class="carousel slide mb-3" data-bs-ride="carousel">
+<div id="galleryCarousel" class="carousel slide" data-bs-ride="carousel">
   <div class="carousel-inner">
     {% for g in gallery %}
     <div class="carousel-item {% if loop.index0 == 0 %}active{% endif %}">
@@ -172,7 +250,7 @@ counters.forEach(counter => {
           {% else %}
           <img src="https://via.placeholder.com/600x400?text=Gallery" class="card-img-top rounded-top object-fit-cover" style="height: 270px; object-fit: cover;" alt="Gallery image">
           {% endif %}
-          <div class="card-body text-center">
+          <div class="card-body text-center mt-3">
             <p class="card-text text-secondary mb-0">{{ g.caption }}</p>
           </div>
         </div>
@@ -189,20 +267,18 @@ counters.forEach(counter => {
     <span class="visually-hidden">Next</span>
   </button>
 </div>
-<div class="text-center mb-5">
+<div class="text-center mb-5 mt-3" style="margin-bottom:2.5rem;">
   <a href="/gallery" class="btn btn-outline-success px-4 fw-bold"><i class="fa fa-images me-2"></i>View All Gallery</a>
 </div>
 
 <!-- Testimonials Carousel -->
-<h2 class="section-title text-center text-danger display-5 mb-4 animate__animated animate__fadeInUp">
-    <i class="fa fa-quote-left me-2"></i>What Our Travelers Say
-</h2>
-<p class="text-center text-muted mb-3">Hear from our happy travelers! Read real stories and testimonials from guests who explored the wonders of North India with JKLG Travel.</p>
-<div id="testimonialCarousel" class="carousel slide mb-5" data-bs-ride="carousel">
+<h2 class="section-title text-center text-danger display-5 mb-0 animate__animated animate__fadeInUp" style="margin-top: 1.5rem;"><i class="fa fa-quote-left me-2"></i>What Our Travelers Say</h2>
+<p class="text-center text-muted mb-3 mt-3" style="margin-bottom:0.5rem;">Hear from our happy travelers! Read real stories and testimonials from guests who explored the wonders of North India with {{ site_settings.site_name }}.</p>
+<div id="testimonialCarousel" class="carousel slide mb-3" data-bs-ride="carousel">
   <div class="carousel-inner">
     {% for t in testimonials %}
     <div class="carousel-item {% if loop.index0 == 0 %}active{% endif %}">
-      <div class="d-flex justify-content-center">
+      <div class="d-flex justify-content-center mb-4">
         <div class="card border-0 shadow-lg bg-white testimonial-card px-4 py-3" style="max-width: 38rem; border-radius: 1.5rem;">
           <div class="card-body text-center">
             <i class="fa fa-quote-left fa-2x text-danger mb-2"></i>
@@ -224,6 +300,9 @@ counters.forEach(counter => {
     <span class="carousel-control-next-icon bg-danger rounded-circle p-2" aria-hidden="true"></span>
     <span class="visually-hidden">Next</span>
   </button>
+  <div class="text-center mt-4" style="margin-bottom:0;">
+  <a href="/testimonials" class="btn btn-outline-success px-4 fw-bold"><i class="fa fa-images me-2"></i>View All Testimonials</a>
+</div>
 </div>
 
 <style>

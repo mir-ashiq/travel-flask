@@ -38,7 +38,7 @@ def init_site_settings():
             defaults = dict(
                 site_name='JKLG Travel',
                 site_title='Travel Agency - Jammu, Kashmir, Ladakh, Gurez',
-                logo='Ladakh.jpg',
+                logo='Logo.png',
                 phone='+91-12345-67890',
                 email='info@jklgtravel.com',
                 address='Jammu, Kashmir, Ladakh & Gurez',
