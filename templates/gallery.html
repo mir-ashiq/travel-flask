@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="section-title text-center">Gallery</h2>
+<div class="row g-4">
+    {% for g in gallery %}
+    <div class="col-md-4">
+        <div class="card h-100 gallery-card" data-bs-toggle="modal" data-bs-target="#galleryModal{{ g.id }}" style="cursor:pointer;">
+            {% if g.image %}
+            <img src="{{ url_for('static', filename='gallery/' + g.image) }}" class="card-img-top" alt="Gallery image">
+            {% elif g.video %}
+            <video class="card-img-top" src="{{ url_for('static', filename='gallery/' + g.video) }}" controls muted style="height:220px;object-fit:cover;"></video>
+            {% else %}
+            <img src="https://via.placeholder.com/600x400?text=Gallery" class="card-img-top" alt="Gallery image">
+            {% endif %}
+            <div class="card-body"><p class="card-text">{{ g.caption }}</p></div>
+        </div>
+        <!-- Modal -->
+        <div class="modal fade" id="galleryModal{{ g.id }}" tabindex="-1" aria-labelledby="galleryModalLabel{{ g.id }}" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="galleryModalLabel{{ g.id }}">{{ g.caption }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body text-center">
+                {% if g.video %}
+                  <video src="{{ url_for('static', filename='gallery/' + g.video) }}" controls autoplay style="max-width:100%;max-height:70vh;"></video>
+                {% elif g.image %}
+                  <img src="{{ url_for('static', filename='gallery/' + g.image) }}" class="img-fluid rounded" alt="Gallery image">
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% if pagination.pages > 1 %}
+<nav aria-label="Page navigation">
+  <ul class="pagination justify-content-center mt-4">
+    {% if pagination.has_prev %}
+      <li class="page-item"><a class="page-link" href="?page={{ pagination.prev_num }}">Previous</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Previous</span></li>
+    {% endif %}
+    {% for p in range(1, pagination.pages + 1) %}
+      <li class="page-item {% if p == pagination.page %}active{% endif %}"><a class="page-link" href="?page={{ p }}">{{ p }}</a></li>
+    {% endfor %}
+    {% if pagination.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ pagination.next_num }}">Next</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Next</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% if not gallery %}
+<p class="text-muted mt-3 text-center">No images yet. Add some in the admin panel!</p>
+{% endif %}
+<style>
+.gallery-card:hover { box-shadow: 0 8px 32px rgba(60,60,120,0.18); }
+</style>
+{% endblock %}

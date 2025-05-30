@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="section-title text-center">All Bookings</h2>
+<div class="table-responsive">
+    <table class="table table-bordered table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Package</th>
+                <th>Message</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in bookings %}
+            <tr>
+                <td>{{ b.name }}</td>
+                <td>{{ b.email }}</td>
+                <td>{{ b.phone }}</td>
+                <td>{{ b.package }}</td>
+                <td>{{ b.message }}</td>
+                <td>{{ b.date.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not bookings %}
+    <p class="text-muted text-center">No bookings yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

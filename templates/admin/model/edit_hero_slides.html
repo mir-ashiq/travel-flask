@@ -1,0 +1,289 @@
+{% extends 'admin/base.html' %}
+
+{# --- IMPORTANT: Include these in your <head> for full functionality --- #}
+{#
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+#}
+
+{% block body %}
+    {{ super() }}
+    <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
+        {% for field in form if field.name not in ['hero_slides', 'csrf_token'] %}
+            <div class="mb-3">
+                {{ field.label(class_="form-label fw-bold") }}
+                {% if field.name.startswith('show_') %}
+                    <div class="form-check form-switch" style="width: 120px;">
+                        {{ field(class_="form-check-input", style="width: 2.5em; height: 1.5em;") }}
+                        <label class="form-check-label ms-2">Enable</label>
+                    </div>
+                {% elif field.type in ['FileField', 'ImageUploadField'] %}
+                    {{ field() }}
+                {% else %}
+                    {{ field(class_="form-control") }}
+                {% endif %}
+                {% if field.description %}
+                    <div class="form-text">{{ field.description }}</div>
+                {% endif %}
+                {% for error in field.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+        <hr>
+        <h4>Hero Slides Editor</h4>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Hero Slides</label>
+            <div id="slides-container"></div>
+            <button type="button" class="btn btn-primary mt-2" id="add-slide-btn"><i class="fa fa-plus"></i> Add Slide</button>
+            <textarea id="hero_slides" name="hero_slides" class="form-control d-none">{{ form.hero_slides.data }}</textarea>
+            {% for error in form.hero_slides.errors %}
+                <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+            <div class="form-text">Add, edit, or remove slides visually. Each slide can have a title, subtitle, image (upload or filename), alt text, CTA, and advanced animation classes. Drag to reorder slides.</div>
+        </div>
+        <button type="submit" class="btn btn-success">Save</button>
+        <a href="{{ return_url }}" class="btn btn-secondary">Cancel</a>
+    </form>
+    <style>
+    .slide-row { cursor: grab; }
+    .slide-row.dragging { opacity: 0.5; }
+    .slide-thumb { max-width: 60px; max-height: 40px; object-fit: cover; border-radius: 4px; }
+    .drag-handle { cursor: grab; font-size: 1.2em; color: #888; margin-right: 8px; }
+    .slide-row:focus-within { box-shadow: 0 0 0 2px #0d6efd33; }
+    </style>
+    <script>
+    // Advanced Hero Slides Editor with alt text, CTA, cropping, drag-and-drop, and live preview
+    const ANIMATIONS = [
+        'animate__fadeInLeft', 'animate__fadeInRight', 'animate__fadeInUp', 'animate__fadeInDown',
+        'animate__zoomIn', 'animate__zoomInLeft', 'animate__zoomInRight', 'animate__bounceIn',
+        'animate__flipInX', 'animate__flipInY', 'animate__slideInLeft', 'animate__slideInRight',
+        'animate__lightSpeedInLeft', 'animate__lightSpeedInRight', 'animate__fadeIn', 'animate__fadeInTopLeft',
+        'animate__fadeInTopRight', 'animate__fadeInBottomLeft', 'animate__fadeInBottomRight',
+    ];
+    function updateSlidesField() {
+        const slides = [];
+        document.querySelectorAll('.slide-row').forEach(function(row) {
+            slides.push({
+                title: row.querySelector('.slide-title').value,
+                subtitle: row.querySelector('.slide-subtitle').value,
+                image: row.querySelector('.slide-image').value,
+                alt: row.querySelector('.slide-alt').value,
+                animation_title: row.querySelector('.slide-animation-title').value,
+                animation_subtitle: row.querySelector('.slide-animation-subtitle').value,
+                cta_text: row.querySelector('.slide-cta-text').value,
+                cta_link: row.querySelector('.slide-cta-link').value
+            });
+        });
+        document.getElementById('hero_slides').value = JSON.stringify(slides, null, 2);
+        renderHeroPreview();
+    }
+    function createAnimationSelect(className, value) {
+        const select = document.createElement('select');
+        select.className = 'form-select ' + className;
+        ANIMATIONS.forEach(anim => {
+            const opt = document.createElement('option');
+            opt.value = anim;
+            opt.textContent = anim.replace('animate__', '').replace(/([A-Z])/g, ' $1');
+            if (anim === value) opt.selected = true;
+            select.appendChild(opt);
+        });
+        return select;
+    }
+    function addSlideRow(slide={}, index) {
+        const container = document.getElementById('slides-container');
+        const row = document.createElement('div');
+        row.className = 'slide-row mb-3 p-2 border rounded bg-light d-flex align-items-center';
+        row.draggable = true;
+        row.innerHTML = `
+            <span class="drag-handle" title="Drag to reorder"><i class="fa fa-bars"></i></span>
+            <div class="row g-2 align-items-end flex-grow-1">
+                <div class="col-md-2"><input type="text" class="form-control slide-title" placeholder="Title" value="${slide.title||''}"></div>
+                <div class="col-md-3"><input type="text" class="form-control slide-subtitle" placeholder="Subtitle" value="${slide.subtitle||''}"></div>
+                <div class="col-md-2">
+                    <input type="text" class="form-control slide-image" placeholder="Image filename or URL" value="${slide.image||''}">
+                    <input type="file" name="slide_image_${index}" class="form-control slide-upload mt-1" accept="image/*">
+                    <img src="${slide.image ? '/static/uploads/' + slide.image : ''}" class="slide-thumb mt-1" style="display:${slide.image ? 'block':'none'};" onerror="this.style.display='none'">
+                </div>
+                <div class="col-md-2 anim-title"></div>
+                <div class="col-md-2 anim-subtitle"></div>
+                <div class="col-md-1"><button type="button" class="btn btn-danger btn-sm slide-delete"><i class="fa fa-trash"></i></button></div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-md-3"><input type="text" class="form-control slide-cta-text" placeholder="CTA Button Text (e.g. Book Now)" value="${slide.cta_text||''}"></div>
+                <div class="col-md-5"><input type="text" class="form-control slide-cta-link" placeholder="CTA Button Link (URL)" value="${slide.cta_link||''}"></div>
+                <div class="col-md-4"><input type="text" class="form-control slide-alt" placeholder="Image Alt Text (for accessibility)" value="${slide.alt||''}"></div>
+            </div>
+        `;
+        // Animation selects
+        row.querySelector('.anim-title').appendChild(createAnimationSelect('slide-animation-title', slide.animation_title||'animate__fadeInLeft'));
+        row.querySelector('.anim-subtitle').appendChild(createAnimationSelect('slide-animation-subtitle', slide.animation_subtitle||'animate__fadeInRight'));
+        // Delete
+        row.querySelector('.slide-delete').onclick = function() {
+            row.remove();
+            updateSlidesField();
+        };
+        // Inputs
+        row.querySelectorAll('input,select').forEach(input => input.addEventListener('input', updateSlidesField));
+        // Upload
+        row.querySelector('.slide-upload').addEventListener('change', function(e) {
+            openCropper(this);
+        });
+        // Drag & drop
+        row.addEventListener('dragstart', function(e) {
+            row.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', Array.from(container.children).indexOf(row));
+        });
+        row.addEventListener('dragend', function() {
+            row.classList.remove('dragging');
+            updateSlidesField();
+        });
+        row.addEventListener('dragover', function(e) { e.preventDefault(); });
+        row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            const from = +e.dataTransfer.getData('text/plain');
+            const to = Array.from(container.children).indexOf(row);
+            if (from !== to) {
+                const moving = container.children[from];
+                if (from < to) {
+                    container.insertBefore(moving, row.nextSibling);
+                } else {
+                    container.insertBefore(moving, row);
+                }
+                updateSlidesField();
+            }
+        });
+        container.appendChild(row);
+        updateSlidesField();
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        const slides = (() => {
+            try { return JSON.parse(document.getElementById('hero_slides').value); } catch { return []; }
+        })();
+        slides.forEach((slide, i) => addSlideRow(slide, i));
+        let slideCount = slides.length;
+        document.getElementById('add-slide-btn').onclick = function(e) {
+            e.preventDefault();
+            addSlideRow({}, slideCount++);
+        };
+    });
+    // Add Cropper.js for image cropping
+    const cropperModalHtml = `
+    <div class="modal fade" id="cropperModal" tabindex="-1" aria-labelledby="cropperModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cropperModalLabel">Crop Slide Image</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <img id="cropperImage" style="max-width:100%;max-height:60vh;">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="cropImageBtn">Crop & Use</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', cropperModalHtml);
+    let cropper = null;
+    let currentCropInput = null;
+
+    function openCropper(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.getElementById('cropperImage');
+            img.src = e.target.result;
+            if (cropper) cropper.destroy();
+            cropper = new window.Cropper(img, {
+                aspectRatio: 16/9,
+                viewMode: 1,
+                autoCropArea: 1
+            });
+            currentCropInput = input;
+            new bootstrap.Modal(document.getElementById('cropperModal')).show();
+        };
+        reader.readAsDataURL(file);
+    }
+    document.getElementById('cropImageBtn').onclick = function() {
+        if (cropper && currentCropInput) {
+            cropper.getCroppedCanvas({width:1280, height:720}).toBlob(blob => {
+                const file = new File([blob], currentCropInput.files[0].name, {type: blob.type});
+                // Replace file input with new cropped file
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                currentCropInput.files = dt.files;
+                // Show preview
+                const img = currentCropInput.closest('.slide-row').querySelector('.slide-thumb');
+                img.src = URL.createObjectURL(file);
+                img.style.display = 'block';
+                // Set filename in text field
+                currentCropInput.closest('.slide-row').querySelector('.slide-image').value = file.name;
+                updateSlidesField();
+                bootstrap.Modal.getInstance(document.getElementById('cropperModal')).hide();
+            }, 'image/jpeg', 0.95);
+        }
+    };
+
+    // Live Preview of Hero Carousel
+    function renderHeroPreview() {
+        const slides = (() => {
+            try { return JSON.parse(document.getElementById('hero_slides').value); } catch { return []; }
+        })();
+        const preview = document.getElementById('hero-preview');
+        if (!preview) return;
+        preview.innerHTML = '';
+        if (!slides.length) {
+            preview.innerHTML = '<div class="alert alert-info">No slides to preview.</div>';
+            return;
+        }
+        let carousel = document.createElement('div');
+        carousel.className = 'carousel slide';
+        carousel.setAttribute('data-bs-ride', 'carousel');
+        carousel.innerHTML = `<div class="carousel-inner">${slides.map((slide, i) => `
+            <div class="carousel-item${i===0?' active':''}" style="background:url('/static/uploads/${slide.image}') center/cover no-repeat; min-height:200px;">
+                <div class="hero text-center d-flex flex-column justify-content-center align-items-center" style="min-height:200px; background:rgba(0,0,0,0.3);">
+                    <h2 class="display-6 text-white animate__animated ${slide.animation_title||''}">${slide.title||''}</h2>
+                    <p class="lead text-white animate__animated ${slide.animation_subtitle||''}">${slide.subtitle||''}</p>
+                    ${slide.cta_text ? `<a href="${slide.cta_link||'#'}" class="btn btn-warning btn-lg mt-2">${slide.cta_text}</a>` : ''}
+                </div>
+            </div>`).join('')}</div>`;
+        preview.appendChild(carousel);
+    }
+
+    // Add Save Order button and visual feedback
+    const saveOrderBtn = document.createElement('button');
+    saveOrderBtn.type = 'button';
+    saveOrderBtn.className = 'btn btn-success mb-3';
+    saveOrderBtn.textContent = 'Save Order';
+    saveOrderBtn.onclick = function() {
+        updateSlidesField();
+        saveOrderBtn.disabled = true;
+        saveOrderBtn.textContent = 'Saving...';
+        setTimeout(() => {
+            saveOrderBtn.textContent = 'Order Saved!';
+            setTimeout(() => {
+                saveOrderBtn.textContent = 'Save Order';
+                saveOrderBtn.disabled = false;
+            }, 1200);
+        }, 800);
+    };
+    document.getElementById('slides-container').parentNode.insertBefore(saveOrderBtn, document.getElementById('slides-container'));
+
+    // Add hero preview container
+    const previewDiv = document.createElement('div');
+    previewDiv.id = 'hero-preview';
+    previewDiv.className = 'my-4';
+    document.getElementById('slides-container').parentNode.appendChild(previewDiv);
+    // Initial preview
+    renderHeroPreview();
+    </script>
+{% endblock %}
+{% block tail %}{{ super() }}{% endblock %}

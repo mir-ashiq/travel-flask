@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Bookings PDF Export</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #333; padding: 6px 8px; }
+        th { background: #eee; }
+    </style>
+</head>
+<body>
+    <h2>Bookings Report</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Package</th>
+                <th>Date</th>
+                <th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for b in bookings %}
+            <tr>
+                <td>{{ b.id }}</td>
+                <td>{{ b.name }}</td>
+                <td>{{ b.email }}</td>
+                <td>{{ b.phone }}</td>
+                <td>{{ b.package }}</td>
+                <td>{{ b.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ b.message }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

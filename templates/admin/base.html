@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<!-- Admin Panel Base: Add dark mode toggle, notification area, and tooltips support -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3">Admin Panel</h1>
+  <div>
+    <button id="darkModeToggle" class="btn btn-outline-secondary btn-sm me-2" title="Toggle dark mode"><i class="fa fa-moon"></i></button>
+    <span id="adminNotifications" class="badge bg-info text-dark" title="Notifications" style="cursor:pointer;">0</span>
+  </div>
+</div>
+<div class="mb-3 d-flex justify-content-end">
+  <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary fw-bold">
+    <i class="fa fa-arrow-left me-1"></i> Back to Admin Dashboard
+  </a>
+</div>
+<hr>
+{% block body %}{% endblock %}
+{% endblock %}
+{% block tail %}{% endblock %}
+</body>
+</html>

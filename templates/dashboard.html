@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="section-title text-center mb-0">Admin Dashboard</h2>
+  <a href="{{ url_for('main.logout') }}" class="btn btn-outline-danger btn-lg px-4 py-2 fw-bold shadow-sm" style="border-radius: 2rem;">
+    <i class="fa fa-sign-out-alt me-2"></i> Logout
+  </a>
+</div>
+<div class="row text-center mb-4">
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-primary">{{ total_bookings }}</h4>
+        <p class="mb-0">Total Bookings</p>
+        <a href="{{ url_for('admin_booking.index_view') }}" class="btn btn-outline-primary btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-success">{{ total_packages }}</h4>
+        <p class="mb-0">Tour Packages</p>
+        <a href="{{ url_for('admin_tourpackage.index_view') }}" class="btn btn-outline-success btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-warning">{{ total_places }}</h4>
+        <p class="mb-0">Destinations</p>
+        <a href="{{ url_for('admin_place.index_view') }}" class="btn btn-outline-warning btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-danger">{{ total_testimonials }}</h4>
+        <p class="mb-0">Testimonials</p>
+        <a href="{{ url_for('admin_testimonial.index_view') }}" class="btn btn-outline-danger btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row text-center mb-4">
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-danger">{{ total_gallery }}</h4>
+        <p class="mb-0">Gallery</p>
+        <a href="{{ url_for('admin_galleryimage.index_view') }}" class="btn btn-outline-secondary btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-dark">-</h4>
+        <p class="mb-0">Site Settings</p>
+        <a href="{{ url_for('admin_sitesettings.index_view') }}" class="btn btn-outline-dark btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-info">{{ total_faqs }}</h4>
+        <p class="mb-0">FAQs</p>
+        <a href="{{ url_for('admin_faq.index_view') }}" class="btn btn-outline-info btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-dark">{{ total_tickets }}</h4>
+        <p class="mb-0">Support Tickets</p>
+        <a href="{{ url_for('admin_supportticket.index_view') }}" class="btn btn-outline-dark btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row text-center mb-4">
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-primary"><i class="fa fa-envelope"></i></h4>
+        <p class="mb-0">Email Settings</p>
+        <a href="{{ url_for('admin_emailsettings.index_view') }}" class="btn btn-outline-primary btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-success"><i class="fa fa-file-alt"></i></h4>
+        <p class="mb-0">Email Templates</p>
+        <a href="{{ url_for('admin_emailtemplate.index_view') }}" class="btn btn-outline-success btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-info"><i class="fa fa-history"></i></h4>
+        <p class="mb-0">Email Logs</p>
+        <a href="{{ url_for('admin_emaillog.index_view') }}" class="btn btn-outline-info btn-sm mt-2">View</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-warning"><i class="fa fa-list"></i></h4>
+        <p class="mb-0">Activity Log</p>
+        <a href="{{ url_for('admin_activitylog.index_view') }}" class="btn btn-outline-warning btn-sm mt-2">View</a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row text-center mb-4">
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-secondary"><i class="fa fa-blog"></i></h4>
+        <p class="mb-0">Blog</p>
+        <a href="{{ url_for('admin_blog.index_view') }}" class="btn btn-outline-secondary btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-dark"><i class="fa fa-ticket-alt"></i></h4>
+        <p class="mb-0">Support Tickets</p>
+        <a href="{{ url_for('admin_supportticket.index_view') }}" class="btn btn-outline-dark btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h4 class="text-dark"><i class="fa fa-users"></i></h4>
+        <p class="mb-0">Users</p>
+        <a href="{{ url_for('admin_user.index_view') }}" class="btn btn-outline-dark btn-sm mt-2">Manage</a>
+      </div>
+    </div>
+  </div>
+
+    <div class="col-md-3 mb-3">
+      <div class="card shadow border-0">
+        <div class="card-body">
+          <h4 class="text-info"><i class="fa fa-download"></i></h4>
+          <p class="mb-0">Export Data</p>
+          <div class="dropdown mt-2">
+            <button class="btn btn-outline-info btn-sm dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+              Export Options
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+              <li><a class="dropdown-item" href="/admin/export_bookings">Export Bookings (CSV)</a></li>
+              <li><a class="dropdown-item" href="/admin/export_bookings_pdf">Export Bookings (PDF)</a></li>
+              <li><a class="dropdown-item" href="/admin/export_packages">Export Packages (CSV)</a></li>
+              <li><a class="dropdown-item" href="/admin/export_packages_pdf">Export Packages (PDF)</a></li>
+              <li><a class="dropdown-item" href="/admin/export_users">Export Users (CSV)</a></li>
+              <li><a class="dropdown-item" href="/admin/export_testimonials">Export Testimonials (CSV)</a></li>
+
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>
+<div class="row mb-4">
+  <div class="col-md-6">
+    <div class="card shadow border-0 mb-3">
+      <div class="card-header bg-primary text-white">Recent Bookings</div>
+      <div class="card-body p-2">
+        <ul class="list-group list-group-flush">
+          {% for b in recent_bookings %}
+          <li class="list-group-item small">
+            <b>{{ b.name }}</b> ({{ b.email }}) - <span class="text-muted">{{ b.package }}</span> <span class="float-end">{{ b.date.strftime('%Y-%m-%d') }}</span>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">No recent bookings.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow border-0 mb-3">
+      <div class="card-header bg-success text-white">Most Popular Packages</div>
+      <div class="card-body p-2">
+        <ul class="list-group list-group-flush">
+          {% for pkg, count in popular_packages %}
+          <li class="list-group-item small">
+            <b>{{ pkg }}</b> <span class="badge bg-success float-end">{{ count }} bookings</span>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">No data.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row mb-4">
+  <div class="col-md-6">
+    <div class="card shadow border-0 mb-3">
+      <div class="card-header bg-info text-white">Bookings Per Month (Last 12 Months)</div>
+      <div class="card-body">
+        <canvas id="bookingsPerMonthChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow border-0 mb-3">
+      <div class="card-header bg-warning text-white">Popular Packages (Top 5)</div>
+      <div class="card-body">
+        <canvas id="popularPackagesChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const months = {{ months|tojson|safe }};
+const bookingsPerMonth = {{ bookings_per_month|tojson|safe }};
+const popularPackages = {{ popular_packages|tojson|safe }};
+const pkgLabels = popularPackages.map(function(p) { return p[0]; });
+const pkgCounts = popularPackages.map(function(p) { return p[1]; });
+// Bookings per month bar chart
+new Chart(document.getElementById('bookingsPerMonthChart'), {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [{
+      label: 'Bookings',
+      data: bookingsPerMonth,
+      backgroundColor: 'rgba(54, 162, 235, 0.7)'
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true } }
+  }
+});
+// Popular packages pie chart
+new Chart(document.getElementById('popularPackagesChart'), {
+  type: 'pie',
+  data: {
+    labels: pkgLabels,
+    datasets: [{
+      data: pkgCounts,
+      backgroundColor: [
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(255, 206, 86, 0.7)',
+        'rgba(75, 192, 192, 0.7)',
+        'rgba(153, 102, 255, 0.7)',
+        'rgba(255, 159, 64, 0.7)'
+      ]
+    }]
+  },
+  options: {
+    plugins: { legend: { position: 'bottom' } }
+  }
+});
+</script>

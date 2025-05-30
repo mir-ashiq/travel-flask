@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tour Packages PDF Export</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; }
+        h1 { text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #888; padding: 6px 8px; }
+        th { background: #f0f0f0; }
+        tr:nth-child(even) { background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Tour Packages</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Price</th>
+                <th>Duration</th>
+                <th>Published</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for p in packages %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>{{ p.title }}</td>
+                <td>{{ p.description|truncate(100) }}</td>
+                <td>{{ p.price }}</td>
+                <td>{{ p.duration }}</td>
+                <td>{{ 'Yes' if p.published else 'No' }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="section-title text-center">Help Center</h2>
+<p class="text-center">Find answers to common questions or contact our support team.</p>
+<div class="text-center mb-4">
+  <a href="{{ url_for('main.faq') }}" class="btn btn-info m-2">View FAQs</a>
+  <a href="{{ url_for('main.contact') }}" class="btn btn-primary m-2">Contact Support</a>
+</div>
+{% endblock %}

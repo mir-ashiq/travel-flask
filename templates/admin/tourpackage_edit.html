@@ -1,0 +1,82 @@
+{% extends 'admin/model/edit.html' %}
+{% block tail %}
+{{ super() }}
+<!-- Help Modal -->
+<div class="modal fade" id="itineraryHelpModal" tabindex="-1" aria-labelledby="itineraryHelpLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="itineraryHelpLabel">How to Write a Day-wise Itinerary</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <ul>
+          <li>Write each day as <b>Day 1: Activity/Places</b> on a new line.</li>
+          <li>Example:<br>
+            <code>Day 1: Arrive in Srinagar, Dal Lake Shikara ride\nDay 2: Gulmarg sightseeing, Gondola ride\nDay 3: Pahalgam river rafting</code>
+          </li>
+          <li>Accommodations, Included, and Excluded fields: List each item on a new line for best display.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// Preview Itinerary
+function previewItinerary() {
+  var text = document.getElementById('itinerary').value;
+  var lines = text.split('\n');
+  var html = '<ul class="timeline list-unstyled">';
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var parts = line.split(':');
+    if (parts.length > 1) {
+      html += '<li class="mb-2"><span class="badge bg-secondary me-2">' + parts[0] + '</span> ' + parts.slice(1).join(':') + '</li>';
+    } else {
+      html += '<li class="mb-2">' + line + '</li>';
+    }
+  }
+  html += '</ul>';
+  document.getElementById('itineraryPreview').innerHTML = html;
+  var modal = new bootstrap.Modal(document.getElementById('itineraryPreviewModal'));
+  modal.show();
+}
+</script>
+<!-- Preview Modal -->
+<div class="modal fade" id="itineraryPreviewModal" tabindex="-1" aria-labelledby="itineraryPreviewLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="itineraryPreviewLabel">Itinerary Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="itineraryPreview" style="font-size:1.1em;"></div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var field = document.getElementById('itinerary');
+  if (field) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-outline-info btn-sm ms-2';
+    btn.innerHTML = '<i class="fa fa-eye"></i> Preview';
+    btn.onclick = previewItinerary;
+    field.parentNode.appendChild(btn);
+    var helpBtn = document.createElement('button');
+    helpBtn.type = 'button';
+    helpBtn.className = 'btn btn-outline-secondary btn-sm ms-2';
+    helpBtn.innerHTML = '<i class="fa fa-question-circle"></i> Help';
+    helpBtn.setAttribute('data-bs-toggle', 'modal');
+    helpBtn.setAttribute('data-bs-target', '#itineraryHelpModal');
+    field.parentNode.appendChild(helpBtn);
+  }
+});
+</script>
+<style>
+.timeline li { position: relative; padding-left: 1.5em; }
+.timeline li:before { content: '\2022'; color: #0d6efd; position: absolute; left: 0; font-size: 1.2em; top: 0; }
+</style>
+{% endblock %}

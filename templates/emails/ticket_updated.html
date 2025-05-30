@@ -1,0 +1,12 @@
+<html>
+<body>
+    <p>Dear {{ name }},</p>
+    <p>Your support ticket (Subject: {{ subject }}) has been updated.</p>
+    <p>Status: {{ status }}</p>
+    {% if response %}
+    <p>Response from our team:</p>
+    <blockquote>{{ response }}</blockquote>
+    {% endif %}
+    <p>Best regards,<br>{{site_name }} Team</p>
+</body>
+</html>

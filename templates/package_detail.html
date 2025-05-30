@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card shadow-lg border-0 mb-4">
+      <img src="{{ url_for('static', filename='packages/' + package.image) if package.image else 'https://via.placeholder.com/600x400?text=Package' }}" class="card-img-top" alt="{{ package.title }}" style="height:320px; object-fit:cover; border-radius:1rem 1rem 0 0;">
+      <div class="card-body">
+        <h2 class="card-title text-warning fw-bold mb-2">{{ package.title }}</h2>
+        <div class="mb-2">
+          <span class="badge bg-warning text-dark fs-6 me-2">₹{{ package.price }}</span>
+          <span class="badge bg-primary fs-6 me-2"><i class="fa fa-clock me-1"></i>{{ package.duration }}</span>
+          <span class="badge bg-success fs-6"><i class="fa fa-star"></i> {{ package.rating if package.rating else '4.8' }}</span>
+        </div>
+        <p class="card-text mb-3">{{ package.description }}</p>
+        <div class="mb-3">
+          <b>Destinations:</b>
+          {% for place in package.places %}
+            <span class="badge bg-info text-dark">{{ place.name }}</span>
+          {% endfor %}
+          {% if package.custom_destinations %}
+            {% for dest in package.custom_destinations.split(',') %}
+              <span class="badge bg-warning text-dark">{{ dest.strip() }}</span>
+            {% endfor %}
+          {% endif %}
+        </div>
+        {% if itinerary_days|length > 0 %}
+        <div class="mb-4">
+          <h5 class="fw-bold text-primary"><i class="fa fa-route me-1"></i> Itinerary</h5>
+          <ul class="timeline list-unstyled">
+            {% for day in itinerary_days %}
+              <li class="mb-2">
+                <span class="badge bg-secondary me-2">Day {{ day.day_number }}</span>
+                <b>{{ day.title }}</b><br>
+                <span>{{ day.description }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% elif package.itinerary %}
+        <div class="mb-4">
+          <h5 class="fw-bold text-primary"><i class="fa fa-route me-1"></i> Itinerary</h5>
+          <ul class="timeline list-unstyled">
+            {% for day in package.itinerary.split('\n') if day.strip() %}
+              <li class="mb-2"><span class="badge bg-secondary me-2">{{ day.split(':')[0] }}</span> {{ day.split(':', 1)[1] if ':' in day else day }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if package.accommodations %}
+        <div class="mb-3">
+          <h6 class="fw-bold text-success"><i class="fa fa-hotel me-1"></i> Accommodations</h6>
+          <div class="ps-2">{{ package.accommodations|replace('\n', '<br>')|safe }}</div>
+        </div>
+        {% endif %}
+        {% if package.included %}
+        <div class="mb-3">
+          <h6 class="fw-bold text-info"><i class="fa fa-check-circle me-1"></i> Included</h6>
+          <ul class="ps-3">
+            {% for item in package.included.split('\n') if item.strip() %}
+              <li><span class="badge bg-success me-2">Included</span> {{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if package.excluded %}
+        <div class="mb-3">
+          <h6 class="fw-bold text-danger"><i class="fa fa-times-circle me-1"></i> Excluded</h6>
+          <ul class="ps-3">
+            {% for item in package.excluded.split('\n') if item.strip() %}
+              <li><span class="badge bg-danger me-2">Excluded</span> {{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <a href="/book?package={{ package.title|urlencode }}" class="btn btn-primary px-4">Book This Package</a>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+.timeline li { position: relative; padding-left: 1.5em; }
+.timeline li:before { content: '\2022'; color: #0d6efd; position: absolute; left: 0; font-size: 1.2em; top: 0; }
+</style>
+{% endblock %}

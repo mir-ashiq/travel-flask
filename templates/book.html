@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block hero %}
+<div class="hero text-center">
+    <h1 class="display-3 fw-bold">Book Your Dream Trip</h1>
+    <p class="lead">Fill out the form below and our team will contact you with the best options!</p>
+</div>
+{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <form method="post" action="/book" class="bg-white p-4 rounded shadow">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+                <label for="name" class="form-label">Full Name</label>
+                <input type="text" class="form-control" id="name" name="name" required>
+            </div>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="mb-3">
+                <label for="phone" class="form-label">Phone</label>
+                <input type="text" class="form-control" id="phone" name="phone" required>
+            </div>
+            <div class="mb-3">
+                <label for="package" class="form-label">Interested Package</label>
+                <input type="text" class="form-control" id="package" name="package" value="{{ package_name or '' }}">
+            </div>
+            <div class="mb-3">
+                <label for="message" class="form-label">Message</label>
+                <textarea class="form-control" id="message" name="message" rows="3"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary px-4">Submit Booking</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
